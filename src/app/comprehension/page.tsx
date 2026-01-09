@@ -2,17 +2,13 @@
 
 import { Box, Heading, Text, VStack, Button, HStack, Progress, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, Spinner, Flex, Container, Fade } from "@chakra-ui/react";
 import Link from "next/link";
-import { useText } from "../TextContext";
+import { useText } from "../providers";
 import { useEffect, useState, useRef } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { FaHome } from 'react-icons/fa';
 import { getCachedQuestions, comprehensionCache, type Question } from '../../utils/caches';
-
-interface Choice {
-  text: string;
-  isCorrect: boolean;
-}
+import type { Choice } from '../types';
 
 const ReadingComprehension = () => {
   const { inputText } = useText();

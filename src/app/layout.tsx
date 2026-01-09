@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import './globals.css';
-import ChakraProviderWrapper from './ChakraProviderWrapper';
-import { TextProvider } from './TextContext';
+import { TextProvider, ChakraProviderWrapper } from './providers';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",

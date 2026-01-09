@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Box, Heading, Text, VStack, Button, Spinner, useToast, Container, Flex } from "@chakra-ui/react";
-import { useText } from "../TextContext";
+import { useText } from "../providers";
 import Link from "next/link";
 import { FaHome, FaBackward, FaForward, FaPlay, FaPause } from 'react-icons/fa';
 import { Slider, SliderTrack, SliderFilledTrack, SliderThumb, HStack } from "@chakra-ui/react";

@@ -9,3 +9,4 @@ export default function ChakraProviderWrapper({ children }: { children: React.Re
     </ChakraProvider>
   )
 }
+

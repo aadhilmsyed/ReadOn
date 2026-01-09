@@ -4,8 +4,9 @@
 
 import { useMemo, useCallback } from 'react';
 import { useToast } from '@chakra-ui/react';
+import { CHARACTER_LIMIT } from '../constants';
 
-const DEFAULT_LIMIT = 3500;
+const DEFAULT_LIMIT = CHARACTER_LIMIT;
 
 export function useCharacterLimit(
   text: string,

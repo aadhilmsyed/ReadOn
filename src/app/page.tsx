@@ -22,12 +22,11 @@ import {
   AlertDescription,
 } from "@chakra-ui/react";
 import Link from "next/link";
-import { useText } from "./TextContext";
+import { useText } from "./providers";
 import { FaBook, FaHeadphones, FaImages, FaMicrophone, FaLinkedin, FaGithub, FaGraduationCap } from "react-icons/fa";
 import Image from 'next/image'
 import ParticlesBackground from '../components/ParticlesBackground';
-
-const CHARACTER_LIMIT = 3500;
+import { CHARACTER_LIMIT, ROUTES } from './constants';
 
 interface FeatureButtonProps {
   href: string;
@@ -336,7 +335,7 @@ export default function Home() {
                 width="100%"
               >
                 <FeatureButton
-                  href="/phonics"
+                  href={ROUTES.PHONICS}
                   title="Phonics Practice"
                   description="Enhance phonetic awareness and word-building skills"
                   icon={FaMicrophone}
@@ -344,7 +343,7 @@ export default function Home() {
                   onDisabledClick={handleDisabledClick}
                 />
                 <FeatureButton
-                  href="/comprehension"
+                  href={ROUTES.COMPREHENSION}
                   title="Reading Comprehension"
                   description="Analyze texts and improve understanding of written content"
                   icon={FaBook}
@@ -352,7 +351,7 @@ export default function Home() {
                   onDisabledClick={handleDisabledClick}
                 />
                 <FeatureButton
-                  href="/visualization"
+                  href={ROUTES.VISUALIZATION}
                   title="Word Visualization"
                   description="Explore visual representations of words and their relationships"
                   icon={FaImages}
@@ -360,7 +359,7 @@ export default function Home() {
                   onDisabledClick={handleDisabledClick}
                 />
                 <FeatureButton
-                  href="/audiobook"
+                  href={ROUTES.AUDIOBOOK}
                   title="Read Aloud"
                   description="Listen to your text being read aloud"
                   icon={FaHeadphones}
@@ -378,7 +377,7 @@ export default function Home() {
 
               <Box width="100%" mt={8}>
                 <FeatureButton
-                  href="/interactive"
+                  href={ROUTES.INTERACTIVE}
                   title="Interactive Learning"
                   description="Experience comprehensive learning with all features combined - phonics, comprehension, visualization, and audio in one seamless experience"
                   icon={FaGraduationCap}

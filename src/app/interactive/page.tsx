@@ -2,7 +2,7 @@
 
 import { Box, Heading, Text, VStack, Image, Spinner, Button, Container, Progress, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, useDisclosure, IconButton, HStack } from '@chakra-ui/react'
 import { useEffect, useState, useRef } from 'react'
-import { useText } from '../TextContext'
+import { useText } from '../providers'
 import Link from 'next/link'
 import { FaHome, FaVolumeUp } from 'react-icons/fa'
 import { 
@@ -13,29 +13,7 @@ import {
   getCachedPhonetics, 
   phoneticsCache 
 } from '../../utils/caches';
-
-interface VisualizationResult {
-  segment: string;
-  image_data: string;
-  segment_type: 'paragraph' | 'sentence';
-}
-
-interface Choice {
-  text: string;
-  isCorrect: boolean;
-}
-
-interface Question {
-  question: string;
-  choices: Choice[];
-}
-
-interface WordData {
-  word: string;
-  phonetic: string;
-  audio_url: string | null;
-  definition: string;
-}
+import type { VisualizationResult, Choice, Question, WordData } from '../types';
 
 const WordVisualization = () => {
   const { inputText } = useText()

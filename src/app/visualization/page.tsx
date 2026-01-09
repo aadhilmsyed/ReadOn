@@ -2,7 +2,7 @@
 
 import { Box, Heading, Text, VStack, Image, Spinner, Button, Container } from '@chakra-ui/react'
 import { useEffect, useState } from 'react'
-import { useText } from '../TextContext'
+import { useText } from '../providers'
 import Link from 'next/link'
 import { FaHome } from 'react-icons/fa'
 import { getCachedVisualization, visualizationCache } from '../../utils/caches'
