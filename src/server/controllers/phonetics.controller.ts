@@ -2,7 +2,7 @@
  * Phonetics controller - HTTP boundary layer
  */
 
-import { Request } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { validateRequest } from '../middlewares/validate';
 import { defaultRateLimiter } from '../middlewares/rateLimit';
@@ -14,7 +14,7 @@ const requestSchema = z.object({
   text: z.string().min(1, 'Text is required').max(3500, 'Text must be 3500 characters or less'),
 });
 
-export async function handlePhoneticsRequest(request: Request) {
+export async function handlePhoneticsRequest(request: NextRequest) {
   try {
     // Rate limiting
     defaultRateLimiter.check(request);

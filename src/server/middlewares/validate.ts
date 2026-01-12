@@ -2,6 +2,7 @@
  * Request validation middleware using Zod
  */
 
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { ValidationError } from './errors';
 
@@ -10,7 +11,7 @@ import { ValidationError } from './errors';
  * Throws ValidationError if validation fails
  */
 export async function validateRequest<T>(
-  request: Request,
+  request: NextRequest,
   schema: z.ZodSchema<T>
 ): Promise<T> {
   try {

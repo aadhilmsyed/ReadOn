@@ -72,9 +72,17 @@ export class GeminiClient {
 
         if (attempt < maxRetries - 1) {
           const delay = retryDelay * Math.pow(2, attempt);
+          const errorMeta: Record<string, unknown> = {
+            attempt: attempt + 1,
+            maxRetries,
+            error: error instanceof Error ? {
+              name: error.name,
+              message: error.message,
+            } : String(error),
+          };
           logger.warn(
             `Gemini request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`,
-            error
+            errorMeta
           );
           await this.sleep(delay);
           continue;

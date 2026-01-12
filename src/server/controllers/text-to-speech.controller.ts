@@ -2,7 +2,7 @@
  * Text-to-speech controller - HTTP boundary layer
  */
 
-import { Request } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
 import { validateRequest } from '../middlewares/validate';
@@ -15,7 +15,7 @@ const requestSchema = z.object({
   text: z.string().min(1, 'Text is required').max(3500, 'Text must be 3500 characters or less'),
 });
 
-export async function handleTextToSpeechRequest(request: Request): Promise<NextResponse> {
+export async function handleTextToSpeechRequest(request: NextRequest): Promise<NextResponse> {
   try {
     // Rate limiting
     defaultRateLimiter.check(request);

@@ -16,7 +16,7 @@ interface LogEntry {
   [key: string]: unknown;
 }
 
-function formatLog(entry: LogEntry): string {
+function formatLog(entry: Omit<LogEntry, 'timestamp'>): string {
   return JSON.stringify({
     ...entry,
     timestamp: new Date().toISOString(),

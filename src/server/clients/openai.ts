@@ -93,7 +93,15 @@ export class OpenAIClient {
 
         if (attempt < maxRetries - 1) {
           const delay = retryDelay * Math.pow(2, attempt);
-          logger.warn(`OpenAI request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, error);
+          const errorMeta: Record<string, unknown> = {
+            attempt: attempt + 1,
+            maxRetries,
+            error: error instanceof Error ? {
+              name: error.name,
+              message: error.message,
+            } : String(error),
+          };
+          logger.warn(`OpenAI request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, errorMeta);
           await this.sleep(delay);
           continue;
         }
@@ -159,7 +167,15 @@ export class OpenAIClient {
         
         if (attempt < maxRetries - 1) {
           const delay = DEFAULT_RETRY_DELAY * Math.pow(2, attempt);
-          logger.warn(`OpenAI TTS request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, error);
+          const errorMeta: Record<string, unknown> = {
+            attempt: attempt + 1,
+            maxRetries,
+            error: error instanceof Error ? {
+              name: error.name,
+              message: error.message,
+            } : String(error),
+          };
+          logger.warn(`OpenAI TTS request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, errorMeta);
           await this.sleep(delay);
           continue;
         }

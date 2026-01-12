@@ -2,6 +2,7 @@
  * Lightweight in-memory rate limiting per IP
  */
 
+import { NextRequest } from 'next/server';
 import { RateLimitError } from './errors';
 
 interface RateLimitEntry {
@@ -27,14 +28,16 @@ class RateLimiter {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [key, entry] of this.store.entries()) {
-      if (entry.resetAt < now) {
+    const keys = Array.from(this.store.keys());
+    for (const key of keys) {
+      const entry = this.store.get(key);
+      if (entry && entry.resetAt < now) {
         this.store.delete(key);
       }
     }
   }
 
-  private getClientId(request: Request): string {
+  private getClientId(request: NextRequest): string {
     // Try to get IP from various headers (for proxies/load balancers)
     const forwarded = request.headers.get('x-forwarded-for');
     if (forwarded) {
@@ -50,7 +53,7 @@ class RateLimiter {
     return 'default';
   }
 
-  check(request: Request): void {
+  check(request: NextRequest): void {
     const clientId = this.getClientId(request);
     const now = Date.now();
     

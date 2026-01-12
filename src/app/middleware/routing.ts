@@ -37,8 +37,11 @@ export function handleRouting(request: NextRequest): NextResponse | null {
   // Check if the path matches a feature route
   if (isFeatureRoute(pathname) && !pathname.startsWith('/pages/')) {
     // Rewrite to the pages/ directory
+    // Next.js App Router: src/app/pages/phonics/page.tsx -> /pages/phonics
     const newPath = `/pages${pathname}`;
-    return NextResponse.rewrite(new URL(newPath, request.url));
+    const url = request.nextUrl.clone();
+    url.pathname = newPath;
+    return NextResponse.rewrite(url);
   }
 
   // Return null to indicate no rewrite needed
