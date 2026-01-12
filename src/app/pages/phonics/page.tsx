@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Box, Button, VStack, HStack, Text, Heading, Flex, Spinner, IconButton, Container, Fade } from '@chakra-ui/react'
 import { FaVolumeUp, FaArrowLeft, FaArrowRight, FaHome } from 'react-icons/fa'
 import Link from 'next/link'
-import { useText } from '../providers'
+import { useText } from '../../providers'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getCachedPhonetics, phoneticsCache } from '../../utils/caches'
-import type { WordData } from '../types'
+import { getCachedPhonetics, phoneticsCache } from '../../../utils/caches'
+import type { WordData } from '../../types'
 
 const Phonics = () => {
   const { inputText } = useText()

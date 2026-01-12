@@ -1,4 +1,4 @@
-import { WordData } from '../types';
+import { WordData } from '../../types';
 
 const API_KEY = process.env.DICTIONARY_API_KEY;
 const TIMEOUT = 5000; // 5 seconds timeout

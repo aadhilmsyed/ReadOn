@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Box, Heading, Text, VStack, Button, Spinner, useToast, Container, Flex } from "@chakra-ui/react";
-import { useText } from "../providers";
+import { useText } from "../../providers";
 import Link from "next/link";
 import { FaHome, FaBackward, FaForward, FaPlay, FaPause } from 'react-icons/fa';
 import { Slider, SliderTrack, SliderFilledTrack, SliderThumb, HStack } from "@chakra-ui/react";
-import { getCachedAudio, audiobookCache } from '../../utils/caches';
+import { getCachedAudio, audiobookCache } from '../../../utils/caches';
 
 const Audiobook = () => {
   const { inputText } = useText();
