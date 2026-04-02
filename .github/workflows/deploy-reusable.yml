@@ -45,7 +45,17 @@ jobs:
             exit 1
           fi
           if [[ -z "${GCP}" || -z "${WIF}" || -z "${SA}" ]]; then
-            echo "ERROR: Missing GitHub Actions Variables (GCP_PROJECT_ID, WORKLOAD_IDENTITY_PROVIDER, or CICD_SERVICE_ACCOUNT_*)." >&2
+            echo "ERROR: One or more GitHub Actions Variables are unset; workflow inputs are empty." >&2
+            echo "Configure repository Variables (Settings → Secrets and variables → Actions → Variables) with these exact names:" >&2
+            [[ -z "${GCP}" ]] && echo "  - missing: GCP_PROJECT_ID" >&2
+            [[ -z "${WIF}" ]] && echo "  - missing: WORKLOAD_IDENTITY_PROVIDER" >&2
+            if [[ -z "${SA}" ]]; then
+              if [[ "${ENV_NAME}" == "test" ]]; then
+                echo "  - missing: CICD_SERVICE_ACCOUNT_TEST (required for pushes to dev)" >&2
+              else
+                echo "  - missing: CICD_SERVICE_ACCOUNT_PROD (required for pushes to main)" >&2
+              fi
+            fi
             echo "See docs/github-actions-setup.md" >&2
             exit 1
           fi
