@@ -33,7 +33,7 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 
 - Prod bucket: `readon-492106-assets`
 - Test bucket: `readon-492106-assets-test`
-- Cloud Build staging (default): `readon-492106_cloudbuild` — CI deployer SAs need object access here for `gcloud builds submit` from GitHub Actions
+- Cloud Build staging (default): `readon-492106_cloudbuild` — CI deployer SAs need object access here for `gcloud builds submit` from GitHub Actions; apply with `ops/gcp/grant-cicd-cloudbuild-access.sh` (also run from `provision.sh` / WIF setup)
 
 ## Artifact Registry
 

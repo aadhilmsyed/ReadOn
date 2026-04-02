@@ -265,6 +265,12 @@ for READON_DEPLOY_ENV in prod test; do
 done
 
 ########################################
+# GitHub Actions: Cloud Build source bucket (CI deployer SAs must exist — run wif/setup-github-oidc-wif.sh if missing)
+########################################
+echo "==> Cloud Build source bucket IAM for CI deployers (if SAs exist)"
+bash "${script_dir}/grant-cicd-cloudbuild-access.sh"
+
+########################################
 # Output key names for handoff
 ########################################
 echo ""

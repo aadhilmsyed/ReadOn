@@ -122,22 +122,8 @@ echo "==> Project-level roles for deployers (Run admin, Cloud Build editor, Serv
 grant_deployer_roles "${CICD_TEST_EMAIL}"
 grant_deployer_roles "${CICD_PROD_EMAIL}"
 
-# Cloud Build default staging bucket (created the first time Cloud Build runs in the project).
-CLOUDBUILD_SOURCE_BUCKET="gs://${GCP_PROJECT_ID}_cloudbuild"
-echo "==> Cloud Build source bucket IAM for CI deployers: ${CLOUDBUILD_SOURCE_BUCKET}"
-if gcloud storage buckets describe "${CLOUDBUILD_SOURCE_BUCKET}" >/dev/null 2>&1; then
-  for cicd_email in "${CICD_TEST_EMAIL}" "${CICD_PROD_EMAIL}"; do
-    gcloud storage buckets add-iam-policy-binding "${CLOUDBUILD_SOURCE_BUCKET}" \
-      --member="serviceAccount:${cicd_email}" \
-      --role="roles/storage.objectAdmin" \
-      --condition=None \
-      --quiet
-  done
-else
-  echo "WARN: ${CLOUDBUILD_SOURCE_BUCKET} not found yet." >&2
-  echo "      Create it by running any Cloud Build once as a project owner (e.g. local: gcloud builds submit with this project)," >&2
-  echo "      then re-run: bash ops/gcp/wif/setup-github-oidc-wif.sh" >&2
-fi
+echo "==> Cloud Build staging bucket + CI deployer object access (idempotent)"
+GCP_PROJECT_ID="${GCP_PROJECT_ID}" bash "${script_dir}/../grant-cicd-cloudbuild-access.sh"
 
 allow_actas_runtime() {
   local cicd_email="$1"

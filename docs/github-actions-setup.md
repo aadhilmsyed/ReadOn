@@ -85,7 +85,7 @@ If `gcloud iam service-accounts add-iam-policy-binding` rejects the `principal:/
 | Prod workflow can’t deploy | Push must be to **`main`** so the OIDC subject matches `refs/heads/main` for `readon-cicd-prod` |
 | Test workflow can’t deploy | Push must be to **`dev`** for `readon-cicd-test` |
 | Permission denied deploying Cloud Run | CI SA needs `run.admin`, `cloudbuild.builds.editor`, and `iam.serviceAccountUser` on the **five** runtime SAs for that environment (re-run `setup-github-oidc-wif.sh` after `provision.sh`) |
-| `forbidden from accessing the bucket [<project>_cloudbuild]` on `gcloud builds submit` | CI deployer needs `roles/storage.objectAdmin` on `gs://<project>_cloudbuild` (script grants this if the bucket exists). If the bucket does not exist yet, run Cloud Build once as a project owner, then **re-run** `ops/gcp/wif/setup-github-oidc-wif.sh`. |
+| `forbidden from accessing the bucket [<project>_cloudbuild]` on `gcloud builds submit` | Run **`bash ops/gcp/grant-cicd-cloudbuild-access.sh`** once with project owner credentials (creates the default `_cloudbuild` bucket in `US` if missing, grants `storage.objectAdmin` + Service Usage consumer to `readon-cicd-test` / `readon-cicd-prod`). Then re-run the workflow. This is also invoked from `provision.sh` and `wif/setup-github-oidc-wif.sh`. |
 
 Reusable workflow uses **concurrency** per environment (`readon-deploy-prod` / `readon-deploy-test`) so overlapping pushes cancel the older in-flight job for that environment.
 
