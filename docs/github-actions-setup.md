@@ -35,6 +35,18 @@ Configure under **Settings → Secrets and variables → Actions → Variables**
 
 **Secrets:** none are required for GCP authentication if WIF is configured as above. Keep using Secrets only for true secrets you add later.
 
+**Important:** Values must live under **Actions → Variables** for this repository (names are case-sensitive). If they are only in `.env` on your laptop or only documented in `INFRA_CREATED.md`, CI will still fail: `vars.GCP_PROJECT_ID` and friends resolve only from GitHub’s variable store.
+
+### CI fails immediately: “missing: GCP_PROJECT_ID” (empty inputs)
+
+If the log shows `Inputs` with blank `gcp_project_id`, `workload_identity_provider`, or `service_account`, the repository variables are not defined or the names do not match exactly.
+
+1. Open **Settings → Secrets and variables → Actions → Variables** for the repo.
+2. Add all four rows from the table above (`GCP_PROJECT_ID`, `WORKLOAD_IDENTITY_PROVIDER`, `CICD_SERVICE_ACCOUNT_PROD`, `CICD_SERVICE_ACCOUNT_TEST`).
+3. Re-run the failed workflow (or push an empty commit to `dev` / `main`).
+
+For **test** deploys (`dev` branch), `CICD_SERVICE_ACCOUNT_TEST` must be set; for **prod** (`main`), `CICD_SERVICE_ACCOUNT_PROD` must be set. Define both so either pipeline can run.
+
 ## Workflow permissions
 
 The deploy workflow sets:
@@ -73,6 +85,7 @@ If `gcloud iam service-accounts add-iam-policy-binding` rejects the `principal:/
 | Prod workflow can’t deploy | Push must be to **`main`** so the OIDC subject matches `refs/heads/main` for `readon-cicd-prod` |
 | Test workflow can’t deploy | Push must be to **`dev`** for `readon-cicd-test` |
 | Permission denied deploying Cloud Run | CI SA needs `run.admin`, `cloudbuild.builds.editor`, and `iam.serviceAccountUser` on the **five** runtime SAs for that environment (re-run `setup-github-oidc-wif.sh` after `provision.sh`) |
+| `forbidden from accessing the bucket [<project>_cloudbuild]` on `gcloud builds submit` | CI deployer needs `roles/storage.objectAdmin` on `gs://<project>_cloudbuild` (script grants this if the bucket exists). If the bucket does not exist yet, run Cloud Build once as a project owner, then **re-run** `ops/gcp/wif/setup-github-oidc-wif.sh`. |
 
 Reusable workflow uses **concurrency** per environment (`readon-deploy-prod` / `readon-deploy-test`) so overlapping pushes cancel the older in-flight job for that environment.
 
@@ -82,7 +95,8 @@ The workflows deploy immediately on push. You can later add [GitHub Environments
 
 ## CI/CD deployer IAM (summary)
 
-- **Project:** `roles/run.admin`, `roles/cloudbuild.builds.editor`
+- **Project:** `roles/run.admin`, `roles/cloudbuild.builds.editor`, `roles/serviceusage.serviceUsageConsumer`
+- **Bucket** `gs://<project-id>_cloudbuild`: `roles/storage.objectAdmin` for each CI deployer SA (so `gcloud builds submit` can upload sources from GitHub Actions)
 - **Per runtime SA:** `roles/iam.serviceAccountUser` on the five prod runtime SAs for `readon-cicd-prod`, and the five test runtime SAs for `readon-cicd-test` (so Cloud Run can mount the correct service account at deploy time)
 
 Cloud Build’s default project service account is granted `roles/artifactregistry.writer` in `provision.sh` so image pushes succeed.

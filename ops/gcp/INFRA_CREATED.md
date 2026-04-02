@@ -33,6 +33,7 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 
 - Prod bucket: `readon-492106-assets`
 - Test bucket: `readon-492106-assets-test`
+- Cloud Build staging (default): `readon-492106_cloudbuild` — CI deployer SAs need object access here for `gcloud builds submit` from GitHub Actions
 
 ## Artifact Registry
 
@@ -79,6 +80,11 @@ Per deployer SA (project level):
 
 - `roles/run.admin`
 - `roles/cloudbuild.builds.editor`
+- `roles/serviceusage.serviceUsageConsumer`
+
+On bucket `gs://readon-492106_cloudbuild` (when it exists):
+
+- `roles/storage.objectAdmin` for each CI deployer SA (source upload for Cloud Build)
 
 Plus `roles/iam.serviceAccountUser` on **only** the five runtime SAs in the matching environment.
 
