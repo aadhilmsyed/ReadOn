@@ -35,8 +35,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Audio files
-src/app/audiobook/audio_files/
-public/audio_files/*
-!public/audio_files/.gitkeep

@@ -1,7 +1,0 @@
-# Core dependencies - minimal versions
-openai==1.14.0
-google-generativeai>=0.3.0
-requests>=2.32.0
-
-# Remove python-dotenv as we can use Vercel's environment variables directly
-# Remove Pillow as it's not strictly necessary for the core functionality 
