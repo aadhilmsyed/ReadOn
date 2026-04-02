@@ -19,6 +19,7 @@ Set `READON_DEPLOY_ENV` to `prod` or `test` before sourcing `vars.sh` or running
 | `provision.sh` | APIs, VPC/SQL/AR, **both** buckets, databases `readon` + `readon_test`, runtime SAs + IAM |
 | `wif/setup-github-oidc-wif.sh` | WIF pool/provider + `readon-cicd-test` / `readon-cicd-prod` deployer SAs |
 | `grant-cicd-cloudbuild-access.sh` | Fix `gcloud builds submit` from CI: Service Usage + `_cloudbuild` bucket IAM (creates bucket if missing) |
+| `ensure-test-runtime-sas.sh` | Create test-stack runtime SAs + IAM + CI `actAs` if `provision.sh` was never run for test |
 | `deploy-stack.sh` | Deploy all microservices then main for one environment |
 | `deploy-main.sh` | Main app only |
 | `deploy-microservice.sh` | Generic microservice deploy (wrappers below) |
