@@ -1,5 +1,10 @@
-import { FeaturePage } from '@views/features/FeaturePage';
+import { AppShell } from '@views/components/AppShell';
+import { PhonicsPracticePage } from '@views/features/PhonicsPracticePage';
 
 export default function Page() {
-  return <FeaturePage featureKey="phonics" />;
+  return (
+    <AppShell>
+      <PhonicsPracticePage />
+    </AppShell>
+  );
 }
