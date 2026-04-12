@@ -20,7 +20,8 @@
       "@/*": ["./src/*"],
       "@views/*": ["./views/*"],
       "@orchestrators/*": ["./orchestrators/*"],
-      "@shared/*": ["./shared/*"]
+      "@shared/*": ["./shared/*"],
+      "@phonics/*": ["./microservices/phonics-service/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
