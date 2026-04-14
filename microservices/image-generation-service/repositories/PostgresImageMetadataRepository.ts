@@ -2,18 +2,19 @@ import { Pool } from 'pg';
 import { IImageMetadataRepository } from './IImageMetadataRepository';
 import { ImageGenerationMetadata } from '../models/ImageGenerationMetadata';
 import { GenerationStatus, ImageProvider } from '../types/enums';
+import { config } from '../config';
 
 export class PostgresImageMetadataRepository implements IImageMetadataRepository {
   private pool: Pool;
 
-  constructor() {
+  constructor(databaseConfig = config.database) {
     this.pool = new Pool({
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      host: databaseConfig.host,
+      port: databaseConfig.port,
+      database: databaseConfig.name,
+      user: databaseConfig.user,
+      password: databaseConfig.password,
+      ssl: databaseConfig.ssl ? { rejectUnauthorized: false } : false,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -186,5 +187,9 @@ export class PostgresImageMetadataRepository implements IImageMetadataRepository
 
   async close(): Promise<void> {
     await this.pool.end();
+  }
+
+  async checkConnection(): Promise<void> {
+    await this.pool.query('SELECT 1');
   }
 }

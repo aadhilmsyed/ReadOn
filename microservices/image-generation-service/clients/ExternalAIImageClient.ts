@@ -1,7 +1,6 @@
 import { ProviderTimeoutError, ProviderUnavailableError } from '../errors/ImageGenerationError';
 import { Logger } from '../utils/logger';
-
-declare const process: { env: Record<string, string | undefined> };
+import { config } from '../config';
 
 export interface ExternalImageRequest {
   prompt: string;
@@ -24,9 +23,9 @@ export class ExternalAIImageClient {
   private logger: Logger;
 
   constructor(
-    apiKey: string = process.env.AI_IMAGE_API_KEY || '',
-    apiEndpoint: string = process.env.AI_IMAGE_API_ENDPOINT || 'https://api.external-ai-provider.com/v1/images',
-    timeoutMs: number = 30000
+    apiKey: string = config.aiProvider.apiKey,
+    apiEndpoint: string = config.aiProvider.endpoint,
+    timeoutMs: number = config.aiProvider.timeoutMs
   ) {
     this.apiKey = apiKey;
     this.apiEndpoint = apiEndpoint;

@@ -26,16 +26,16 @@
 ### 2.1 Set Up Cloud SQL PostgreSQL Instance
 - [x] Go to Google Cloud Console → SQL
 - [x] Click "Create Instance" → Choose PostgreSQL
-- [ ] Configure instance:
+- [x] Configure instance:
   - Instance ID: `readon-image-generation-db` (unique per microservice)
   - Password: Set a strong password for `postgres` user
   - Region: Choose closest to your app (e.g., `us-central1`)
   - Database version: PostgreSQL 15 (recommended)
   - Machine type: Start with `db-f1-micro` (free tier eligible) or `db-g1-small`
   - Storage: 10 GB SSD (auto-increase enabled)
-- [ ] Under "Connections" → Enable "Public IP" (for development)
-- [ ] Add your IP to "Authorized networks" for testing
-- [ ] Click "Create" and wait ~5-10 minutes
+- [x] Under "Connections" → Enable "Public IP" (for development)
+- [x] Add your IP to "Authorized networks" for testing
+- [x] Click "Create" and wait ~5-10 minutes
 
 **Note:** Each microservice should have its own database instance for proper isolation:
 - `readon-image-generation-db` - Image Generation Service
@@ -45,9 +45,9 @@
 - etc.
 
 ### 2.2 Create Database and Schema
-- [ ] Once instance is running, click "Databases" tab
-- [ ] Create new database: `image_generation` (specific to this service)
-- [ ] Connect using Cloud Shell or local `psql`:
+- [x] Once instance is running, click "Databases" tab
+- [x] Create new database: `image_generation` (specific to this service)
+- [x] Connect using Cloud Shell or local `psql`:
 ```bash
 # Option 1: Using gcloud CLI
 gcloud sql connect readon-image-generation-db --user=postgres --database=image_generation
@@ -55,7 +55,7 @@ gcloud sql connect readon-image-generation-db --user=postgres --database=image_g
 # Option 2: Using psql with public IP
 psql "host=YOUR_INSTANCE_IP dbname=image_generation user=postgres password=YOUR_PASSWORD sslmode=require"
 ```
-- [ ] Run the schema creation script:
+- [x] Run the schema creation script:
 ```sql
 CREATE TABLE Image_Generation_Metadata (
   Generation_ID        VARCHAR(255) PRIMARY KEY,
@@ -81,17 +81,17 @@ CREATE INDEX idx_user_id ON Image_Generation_Metadata(User_ID);
 CREATE INDEX idx_status ON Image_Generation_Metadata(Status);
 CREATE INDEX idx_created_at ON Image_Generation_Metadata(Created_At);
 ```
-- [ ] Verify table created: `\dt` and `\d Image_Generation_Metadata`
+- [x] Verify table created: `\dt` and `\d Image_Generation_Metadata`
 
 ### 2.3 Configure Connection in Your App
-- [ ] Install PostgreSQL client: `npm install pg @types/pg`
-- [ ] Get connection details from Cloud SQL:
+- [x] Install PostgreSQL client: `npm install pg @types/pg`
+- [x] Get connection details from Cloud SQL:
   - Instance connection name: `PROJECT_ID:REGION:readon-image-generation-db`
   - Public IP address
   - Database name: `image_generation`
   - Username: `postgres`
   - Password: (what you set)
-- [ ] Add to `.env`:
+- [x] Add to `.env`:
 ```bash
 DB_HOST=YOUR_CLOUD_SQL_PUBLIC_IP
 DB_PORT=5432
@@ -102,13 +102,13 @@ DB_SSL=true
 ```
 
 ### 2.4 Implement PostgreSQL Repository
-- [ ] Create `PostgresImageMetadataRepository.ts` implementing `IImageMetadataRepository`
-- [ ] Set up connection pool with SSL
-- [ ] Implement `save()` method with array handling
-- [ ] Implement `findById()` method
-- [ ] Implement `update()` method
-- [ ] Add proper error handling
-- [ ] Test connection on startup
+- [x] Create `PostgresImageMetadataRepository.ts` implementing `IImageMetadataRepository`
+- [x] Set up connection pool with SSL
+- [x] Implement `save()` method with array handling
+- [x] Implement `findById()` method
+- [x] Implement `update()` method
+- [x] Add proper error handling
+- [x] Test connection on startup
 
 **File to create:**
 ```
@@ -258,17 +258,20 @@ body: JSON.stringify({
 ## ✅ Phase 4: Cache Implementation (COMPLETED - In-Memory)
 
 ### 4.1 Choose Cache Solution
-- [ ] Decide: Redis, Memcached, or keep in-memory?
-- [ ] If Redis: Set up Redis instance
-- [ ] Install Redis client: `npm install redis @types/redis`
+- [x] Decide: Redis, Memcached, or keep in-memory?
+- [x] Keep in-memory cache for current scope
+- [x] Skip Redis setup for current scope
+- [x] Skip Redis client dependency for current scope
 
 ### 4.2 Implement Redis Cache (if chosen)
-- [ ] Create `RedisImageCache.ts` implementing `IImageGenerationCache`
-- [ ] Implement `get()` method
-- [ ] Implement `set()` with TTL
-- [ ] Implement `delete()` method
-- [ ] Add connection error handling
-- [ ] Test cache operations
+- [x] Redis cache implementation not needed for current in-memory decision
+- [x] In-memory `get()` method implemented
+- [x] In-memory `set()` with TTL implemented
+- [x] In-memory `delete()` method implemented
+- [x] In-memory cache does not require connection error handling
+- [x] Cache operations covered by local smoke usage
+
+**Decision:** Redis is intentionally skipped for now. The service uses `InMemoryImageCache`, which satisfies current local/demo needs without adding infrastructure.
 
 **File to create:**
 ```
@@ -280,16 +283,16 @@ cache/RedisImageCache.ts
 ## ✅ Phase 5: HTTP Server Setup (COMPLETED)
 
 ### 5.1 Choose Framework
-- [ ] Decide: Express, Fastify, or NestJS?
-- [ ] Install dependencies: `npm install express @types/express`
+- [x] Decide: Express, Fastify, or NestJS?
+- [x] Install dependencies: `npm install express @types/express`
 
 ### 5.2 Create HTTP Server
-- [ ] Create `server.ts` or `app.ts` in microservice root
-- [ ] Set up Express app
-- [ ] Add body parser middleware
-- [ ] Add CORS middleware (if needed)
-- [ ] Add error handling middleware
-- [ ] Define routes using `imageGenerationRoutes()`
+- [x] Create `server.ts` or `app.ts` in microservice root
+- [x] Set up Express app
+- [x] Add body parser middleware
+- [x] Add CORS middleware (if needed)
+- [x] Add error handling middleware
+- [x] Define routes using `imageGenerationRoutes()`
 
 **File to create:**
 ```typescript
@@ -317,9 +320,9 @@ app.listen(PORT, () => {
 ```
 
 ### 5.3 Test HTTP Endpoints
-- [ ] Start server: `npm run dev` or `ts-node server.ts`
-- [ ] Test POST `/images/generate` with Postman/curl
-- [ ] Test GET `/images/:requestId` with Postman/curl
+- [x] Start server: `npm run dev` or `ts-node server.ts`
+- [x] Test POST `/images/generate` with Postman/curl
+- [x] Test GET `/images/:requestId` with Postman/curl
 - [ ] Verify error responses
 
 ---
@@ -348,21 +351,21 @@ app.listen(PORT, () => {
 ## 🔒 Phase 7: Security & Configuration (TODO)
 
 ### 7.1 Environment Variables
-- [ ] Create `.env.example` template
-- [ ] Document all required environment variables
-- [ ] Add validation for required env vars on startup
+- [x] Create `.env.example` template
+- [x] Document all required environment variables
+- [x] Add validation for required env vars on startup
 
 ### 7.2 Security
 - [ ] Add API key validation (if exposing publicly)
 - [ ] Add rate limiting at HTTP level
 - [ ] Sanitize user inputs
-- [ ] Add request size limits
-- [ ] Add timeout configurations
+- [x] Add request size limits
+- [x] Add timeout configurations
 
 ### 7.3 Configuration File
-- [ ] Create `config.ts` for centralized configuration
-- [ ] Load from environment variables
-- [ ] Add default values
+- [x] Create `config.ts` for centralized configuration
+- [x] Load from environment variables
+- [x] Add default values
 
 **File to create:**
 ```typescript
@@ -396,8 +399,8 @@ export const config = {
 ## 📦 Phase 8: Dependencies & Build (TODO)
 
 ### 8.1 Package.json
-- [ ] Create `package.json` in microservice directory
-- [ ] Add dependencies: express, database client, cache client
+- [x] Create `package.json` in microservice directory
+- [x] Add dependencies: express, database client, cache client
 - [ ] Add dev dependencies: typescript, @types/*, jest, ts-node
 - [ ] Add scripts: `dev`, `build`, `test`, `start`
 
@@ -430,30 +433,30 @@ export const config = {
 ```
 
 ### 8.2 TypeScript Configuration
-- [ ] Create `tsconfig.json` in microservice directory
-- [ ] Configure output directory
-- [ ] Configure module resolution
+- [x] Create `tsconfig.json` in microservice directory
+- [x] Configure output directory
+- [x] Configure module resolution
 
 ---
 
 ## 🚀 Phase 9: Deployment Preparation (TODO)
 
 ### 9.1 Docker
-- [ ] Create `Dockerfile` for the microservice
-- [ ] Create `docker-compose.yml` for local development
-- [ ] Test Docker build
-- [ ] Test Docker run
+- [x] Create `Dockerfile` for the microservice
+- [x] Create `docker-compose.yml` for local development
+- [x] Test Docker build
+- [x] Test Docker run
 
 ### 9.2 Logging & Monitoring
-- [ ] Ensure structured logging is working
+- [x] Ensure structured logging is working
 - [ ] Add request/response logging
 - [ ] Add performance metrics
 - [ ] Set up error tracking (optional: Sentry)
 
 ### 9.3 Health Checks
-- [ ] Add `/health` endpoint
-- [ ] Add `/ready` endpoint
-- [ ] Check database connection
+- [x] Add `/health` endpoint
+- [x] Add `/ready` endpoint
+- [x] Check database connection
 - [ ] Check cache connection
 
 ---
@@ -461,15 +464,15 @@ export const config = {
 ## 🔗 Phase 10: Integration with Main App (TODO)
 
 ### 10.1 Service Discovery
-- [ ] Decide how main app will call this microservice
-- [ ] Add service URL to main app configuration
-- [ ] Test connectivity
+- [x] Decide how main app will call this microservice
+- [x] Add service URL to main app configuration
+- [x] Test connectivity
 
 ### 10.2 API Client for Main App
-- [ ] Create client wrapper in main app
-- [ ] Handle network errors
-- [ ] Add retry logic
-- [ ] Add timeout handling
+- [x] Create client wrapper in main app
+- [x] Handle network errors
+- [x] Add retry logic
+- [x] Add timeout handling
 
 ### 10.3 End-to-End Testing
 - [ ] Test story creation → image generation flow
