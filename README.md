@@ -52,6 +52,12 @@ The application currently runs as a static Next.js and Chakra UI experience with
     └── providers/
 ```
 
+## Architectural Style
+
+ReadOn follows a **Microservices + Orchestrator (Backend-for-Frontend)** architecture, layered over a Next.js UI and deployed on Google Cloud Run. The top-level directories (`views/`, `orchestrators/`, `microservices/`, `shared/`, `ops/gcp/`) directly reflect this style — each microservice is independently deployable with its own Dockerfile and MVC structure, the orchestrator layer is the single seam through which the UI composes service calls, and infrastructure-as-code is kept separate from application code.
+
+See [docs/architecture.md](docs/architecture.md) for the full architectural style write-up, dependency direction, and rationale.
+
 ## Architectural Separation
 
 ### `views/`
