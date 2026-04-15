@@ -1,26 +1,101 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   Box,
+  Button,
   Heading,
   HStack,
+  Icon,
+  Input,
   SimpleGrid,
   Text,
   Textarea,
   VStack,
+  useToast,
 } from '@chakra-ui/react';
 
 import { featureDefinitions } from '@shared/content/features';
-import { FeatureCard } from '@views/components/FeatureCard';
 import { AppShell } from '@views/components/AppShell';
+import { useSession } from '@views/providers/SessionProvider';
 import { useText } from '@views/providers/TextProvider';
+import type { FeatureKey } from '@shared/types/features';
 
-const CHARACTER_LIMIT = 3500;
+const TITLE_MAX = 100;
+const TEXT_CHARACTER_LIMIT = 3500;
+const VALID_FEATURES: ReadonlyArray<FeatureKey> = ['phonics', 'comprehension', 'visualization', 'audiobook'];
 
 export default function HomePage() {
   const { inputText, setInputText } = useText();
-  const overLimit = inputText.length > CHARACTER_LIMIT;
+  const { session } = useSession();
+  const [title, setTitle] = useState('');
+  const [submittingFeature, setSubmittingFeature] = useState<FeatureKey | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
+
+  // Prefill from ?storyId=&service= when user clicked a History link on the dashboard.
+  useEffect(() => {
+    const storyId = searchParams.get('storyId');
+    const service = searchParams.get('service') as FeatureKey | null;
+    if (!storyId || !service || !VALID_FEATURES.includes(service)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/dashboard/stories/${service}/${storyId}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const story = await res.json();
+        if (cancelled) return;
+        if (typeof story.title === 'string')       setTitle(story.title);
+        if (typeof story.source_text === 'string') setInputText(story.source_text);
+      } catch {/* silent — user can still type fresh content */}
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const titleOver = title.length > TITLE_MAX;
+  const titleEmpty = title.trim().length === 0;
+  const textEmpty  = inputText.trim().length === 0;
+  const textOver   = inputText.length > TEXT_CHARACTER_LIMIT;
+
+  async function handleStartFeature(feature: FeatureKey) {
+    if (titleEmpty) return toast({ status: 'error', title: 'Title is required', duration: 3000, isClosable: true });
+    if (titleOver)  return toast({ status: 'error', title: `Title must be at most ${TITLE_MAX} characters`, duration: 3000, isClosable: true });
+    if (textEmpty)  return toast({ status: 'error', title: 'Text is required', duration: 3000, isClosable: true });
+
+    if (!session) {
+      toast({ status: 'warning', title: 'Please sign in', description: 'Sign in to use a learning experience.', duration: 3000, isClosable: true });
+      router.push('/auth');
+      return;
+    }
+
+    setSubmittingFeature(feature);
+    try {
+      const res = await fetch('/api/features/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ feature, title: title.trim(), sourceText: inputText.trim(), userId: session.user.email }),
+      });
+      const body = await res.json();
+      if (res.status === 402) {
+        toast({ status: 'error', title: 'Insufficient credits', description: 'Recharge on the Dashboard to continue.', duration: 4000, isClosable: true });
+        return;
+      }
+      if (!res.ok) {
+        const detail = body.field ? `${body.field}: ${body.reason}` : body.message;
+        toast({ status: 'error', title: body.error || 'Could not start feature', description: detail, duration: 4000, isClosable: true });
+        return;
+      }
+      router.push(body.redirectTo);
+    } catch (err) {
+      toast({ status: 'error', title: 'Network error', description: (err as Error).message, duration: 4000, isClosable: true });
+    } finally {
+      setSubmittingFeature(null);
+    }
+  }
 
   return (
     <AppShell>
@@ -40,63 +115,97 @@ export default function HomePage() {
           </Text>
           <Text fontSize="lg" color="gray.600" maxW="4xl" lineHeight="tall">
             Read On is an AI-powered reading companion designed to enhance your learning experience through
-            multiple interactive tools. Start by inputting your text in the box below, then select one of the
-            four distinct learning modes:
+            multiple interactive tools. Give your reading a title, paste your text, and pick one of the four
+            learning modes below.
           </Text>
         </VStack>
 
-        <Box
-          bg="white"
-          p={8}
-          borderRadius="xl"
-          shadow="lg"
-          border="1px"
-          borderColor="gray.200"
-        >
+        <Box bg="white" p={8} borderRadius="xl" shadow="lg" border="1px" borderColor="gray.200">
           <VStack spacing={4} align="stretch">
-            <VStack spacing={1}>
-              <Text fontSize="xl" fontWeight="semibold" color="gray.700">
-                Add Reading Text
-              </Text>
-              <Text fontSize="sm" color="gray.500">
-                This text is stored client-side so it remains available as you move between pages.
-              </Text>
+            <VStack spacing={1} align="stretch">
+              <Text fontSize="sm" fontWeight="semibold" color="gray.700">Title</Text>
+              <Input
+                placeholder="A short title (max 100 characters)"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                isInvalid={titleOver}
+              />
+              <HStack justify="space-between">
+                <Text fontSize="xs" color={titleOver ? 'red.500' : 'gray.500'}>
+                  {title.length}/{TITLE_MAX}
+                </Text>
+                {titleOver && <Text fontSize="xs" color="red.500">Title is too long</Text>}
+              </HStack>
             </VStack>
-            <Textarea
-              placeholder="Type or paste your text here..."
-              size="lg"
-              value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
-              minHeight="300px"
-              resize="vertical"
-              borderColor={overLimit ? 'red.400' : 'gray.200'}
-              _focus={{ borderColor: overLimit ? 'red.500' : 'blue.400', boxShadow: 'none' }}
-            />
-            <HStack justify="space-between" flexWrap="wrap">
-              <Text fontSize="sm" color={overLimit ? 'red.500' : 'gray.500'}>
-                {inputText.length}/{CHARACTER_LIMIT} characters
-              </Text>
-              <Text fontSize="sm" color="gray.500">
-                Navigation remains live even when backend-driven actions are stubbed.
-              </Text>
-            </HStack>
+
+            <VStack spacing={1} align="stretch">
+              <Text fontSize="sm" fontWeight="semibold" color="gray.700">Reading Text</Text>
+              <Textarea
+                placeholder="Type or paste your text here..."
+                size="lg"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                minHeight="300px"
+                resize="vertical"
+                borderColor={textOver ? 'red.400' : 'gray.200'}
+                _focus={{ borderColor: textOver ? 'red.500' : 'blue.400', boxShadow: 'none' }}
+              />
+              <HStack justify="space-between" flexWrap="wrap">
+                <Text fontSize="sm" color={textOver ? 'red.500' : 'gray.500'}>
+                  {inputText.length}/{TEXT_CHARACTER_LIMIT} characters
+                </Text>
+                <Text fontSize="sm" color="gray.500">
+                  Navigation remains live even when backend-driven actions are stubbed.
+                </Text>
+              </HStack>
+            </VStack>
           </VStack>
         </Box>
 
-        <VStack spacing={6} align="stretch">
+        <VStack spacing={2} align="stretch">
           <Heading as="h2" size="lg" textAlign="center" color="blue.600">
             Choose a Learning Experience
           </Heading>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-            {featureDefinitions.map((feature) => (
-              <FeatureCard
-                key={feature.key}
-                href={feature.route}
-                title={feature.title}
-                description={feature.shortDescription}
-                icon={feature.icon}
-              />
-            ))}
+          <Text fontSize="sm" color="gray.500" textAlign="center">
+            10 credits charged per service
+          </Text>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8} pt={4}>
+            {featureDefinitions.map((feature) => {
+              const isSubmitting = submittingFeature === feature.key;
+              const isOtherSubmitting = submittingFeature !== null && submittingFeature !== feature.key;
+              return (
+                <Button
+                  key={feature.key}
+                  onClick={() => handleStartFeature(feature.key)}
+                  isLoading={isSubmitting}
+                  isDisabled={isOtherSubmitting}
+                  loadingText={feature.title}
+                  height="auto"
+                  p={8}
+                  colorScheme="blue"
+                  variant="outline"
+                  width="100%"
+                  minH="220px"
+                  whiteSpace="normal"
+                  textAlign="center"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  transition="all 0.3s ease"
+                  _hover={{ transform: 'translateY(-4px)', shadow: 'xl', bg: 'blue.50' }}
+                >
+                  <VStack spacing={4} align="center" width="100%">
+                    <Icon as={feature.icon} boxSize={8} color="blue.500" />
+                    <Text fontSize="2xl" fontWeight="bold" textAlign="center" whiteSpace="normal">
+                      {feature.title}
+                    </Text>
+                    <Text fontSize="md" textAlign="center" color="gray.600" lineHeight="tall" whiteSpace="normal">
+                      {feature.shortDescription}
+                    </Text>
+                  </VStack>
+                </Button>
+              );
+            })}
           </SimpleGrid>
         </VStack>
 
@@ -105,29 +214,13 @@ export default function HomePage() {
             <Heading as="h2" size="lg" textAlign="center" color="blue.600">
               More About Read On
             </Heading>
-            
             <Text fontSize="lg" textAlign="center" lineHeight="tall">
               Read On offers four powerful learning tools, each designed to address different aspects
               of reading comprehension and learning:
             </Text>
-
             <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-              <Box 
-                p={6} 
-                borderWidth="1px" 
-                borderRadius="lg" 
-                borderColor="gray.200"
-                bg="white"
-                transition="all 0.3s ease"
-                _hover={{
-                  transform: "translateY(-2px)",
-                  shadow: "md",
-                  bgGradient: "linear(to-br, white, blue.50)"
-                }}
-              >
-                <Heading as="h3" size="md" color="blue.600" mb={4}>
-                  1. Phonics Practice
-                </Heading>
+              <Box p={6} borderWidth="1px" borderRadius="lg" borderColor="gray.200" bg="white" transition="all 0.3s ease" _hover={{ transform: 'translateY(-2px)', shadow: 'md', bgGradient: 'linear(to-br, white, blue.50)' }}>
+                <Heading as="h3" size="md" color="blue.600" mb={4}>1. Phonics Practice</Heading>
                 <Text fontSize="lg" lineHeight="tall">
                   Having trouble with tricky words? Our Phonics Practice tool is like having a
                   personal reading coach! It helps you break down difficult words into smaller,
@@ -136,23 +229,8 @@ export default function HomePage() {
                   with challenging vocabulary and improving your reading skills.
                 </Text>
               </Box>
-
-              <Box 
-                p={6} 
-                borderWidth="1px" 
-                borderRadius="lg" 
-                borderColor="gray.200"
-                bg="white"
-                transition="all 0.3s ease"
-                _hover={{
-                  transform: "translateY(-2px)",
-                  shadow: "md",
-                  bgGradient: "linear(to-br, white, blue.50)"
-                }}
-              >
-                <Heading as="h3" size="md" color="blue.600" mb={4}>
-                  2. Reading Comprehension
-                </Heading>
+              <Box p={6} borderWidth="1px" borderRadius="lg" borderColor="gray.200" bg="white" transition="all 0.3s ease" _hover={{ transform: 'translateY(-2px)', shadow: 'md', bgGradient: 'linear(to-br, white, blue.50)' }}>
+                <Heading as="h3" size="md" color="blue.600" mb={4}>2. Reading Comprehension</Heading>
                 <Text fontSize="lg" lineHeight="tall">
                   Understanding what you read is just as important as reading itself. This tool
                   turns your reading into an interactive quiz game! After you read a text, it creates
@@ -162,23 +240,8 @@ export default function HomePage() {
                   better!
                 </Text>
               </Box>
-
-              <Box 
-                p={6} 
-                borderWidth="1px" 
-                borderRadius="lg" 
-                borderColor="gray.200"
-                bg="white"
-                transition="all 0.3s ease"
-                _hover={{
-                  transform: "translateY(-2px)",
-                  shadow: "md",
-                  bgGradient: "linear(to-br, white, blue.50)"
-                }}
-              >
-                <Heading as="h3" size="md" color="blue.600" mb={4}>
-                  3. Word Visualization
-                </Heading>
+              <Box p={6} borderWidth="1px" borderRadius="lg" borderColor="gray.200" bg="white" transition="all 0.3s ease" _hover={{ transform: 'translateY(-2px)', shadow: 'md', bgGradient: 'linear(to-br, white, blue.50)' }}>
+                <Heading as="h3" size="md" color="blue.600" mb={4}>3. Word Visualization</Heading>
                 <Text fontSize="lg" lineHeight="tall">
                   Sometimes words can paint pictures in our minds - and this tool makes those pictures
                   real! It creates beautiful, custom images that match what you&apos;re reading about.
@@ -187,25 +250,10 @@ export default function HomePage() {
                   understand what you&apos;re reading in a fun, visual way.
                 </Text>
               </Box>
-
-              <Box 
-                p={6} 
-                borderWidth="1px" 
-                borderRadius="lg" 
-                borderColor="gray.200"
-                bg="white"
-                transition="all 0.3s ease"
-                _hover={{
-                  transform: "translateY(-2px)",
-                  shadow: "md",
-                  bgGradient: "linear(to-br, white, blue.50)"
-                }}
-              >
-                <Heading as="h3" size="md" color="blue.600" mb={4}>
-                  4. Read Aloud
-                </Heading>
+              <Box p={6} borderWidth="1px" borderRadius="lg" borderColor="gray.200" bg="white" transition="all 0.3s ease" _hover={{ transform: 'translateY(-2px)', shadow: 'md', bgGradient: 'linear(to-br, white, blue.50)' }}>
+                <Heading as="h3" size="md" color="blue.600" mb={4}>4. Audiobook</Heading>
                 <Text fontSize="lg" lineHeight="tall">
-                  Want to hear your text come to life? Our Read Aloud feature is like having a
+                  Want to hear your text come to life? Our Audiobook feature is like having a
                   friendly storyteller right beside you! It reads your text out loud while highlighting
                   each word as it goes, making it easy to follow along. This is great for learning
                   how words should sound, improving your pronunciation, or just giving your eyes a
@@ -214,22 +262,8 @@ export default function HomePage() {
               </Box>
             </SimpleGrid>
 
-            <Box 
-              p={6} 
-              borderWidth="1px" 
-              borderRadius="lg" 
-              borderColor="gray.200"
-              bg="white"
-              transition="all 0.3s ease"
-              _hover={{
-                transform: "translateY(-2px)",
-                shadow: "md",
-                bgGradient: "linear(to-br, white, blue.50)"
-              }}
-            >
-              <Heading as="h3" size="md" color="blue.600" mb={4}>
-                5. User Dashboard
-              </Heading>
+            <Box p={6} borderWidth="1px" borderRadius="lg" borderColor="gray.200" bg="white" transition="all 0.3s ease" _hover={{ transform: 'translateY(-2px)', shadow: 'md', bgGradient: 'linear(to-br, white, blue.50)' }}>
+              <Heading as="h3" size="md" color="blue.600" mb={4}>5. User Dashboard</Heading>
               <Text fontSize="lg" lineHeight="tall">
                 The Read On dashboard gives learners a personal home base for everything they create and
                 explore. It is designed to bring together profile details, saved generations, learning history,
@@ -250,19 +284,15 @@ export default function HomePage() {
 
         <Box maxW="800px" mx="auto">
           <VStack align="stretch" spacing={8} mt={6}>
-            <Heading as="h2" size="lg" textAlign="center" color="blue.600">
-              Why We Built Read On
-            </Heading>
-
+            <Heading as="h2" size="lg" textAlign="center" color="blue.600">Why We Built Read On</Heading>
             <Text fontSize="lg" textAlign="left" lineHeight="tall">
-              Having worked with children with learning disabilities , we have witnessed firsthand the
+              Having worked with children with learning disabilities, we have witnessed firsthand the
               unique challenges these remarkable young minds face in their educational journey.
               Traditional learning methods often fall short in addressing their diverse needs, leaving
               many bright and capable students struggling to reach their full potential. This personal
               experience has been the driving force behind Read On, born from a deep-seated desire to
               create a tool that adapts to each child&apos;s unique learning style and pace.
             </Text>
-
             <Text fontSize="lg" textAlign="left" lineHeight="tall">
               Read On harnesses the power of artificial intelligence to transform the learning experience
               for special needs children. By combining visual, auditory, and interactive elements, we&apos;ve
@@ -274,7 +304,6 @@ export default function HomePage() {
               to help build their confidence and independence, proving that with the right tools, every
               child can thrive.
             </Text>
-
             <Text fontSize="lg" textAlign="left" lineHeight="tall">
               We hope that through our application, we can help people of all skill levels overcome
               their learning barriers and <Text as="span" fontStyle="italic">Read On</Text>.
@@ -292,12 +321,7 @@ export default function HomePage() {
               style={{ objectFit: 'contain' }}
               priority
             />
-            <Text 
-              fontSize="md" 
-              color="gray.600" 
-              fontStyle="italic"
-              textAlign="center"
-            >
+            <Text fontSize="md" color="gray.600" fontStyle="italic" textAlign="center">
               A mother and a child read a book together
             </Text>
           </VStack>
