@@ -48,13 +48,17 @@ GET /meta
 
 ## Required Environment
 
-Comprehension persistence uses `DATABASE_URL`.
+Comprehension persistence uses the shared database environment format from `.env.example`.
 
 ```bash
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/comprehension
+READON_DATABASE_NAME=comprehension
+READON_DATABASE_HOST=localhost
+READON_DATABASE_PORT=5432
+READON_DATABASE_USER=readon
+READON_DATABASE_PASSWORD=REPLACE_ME
 ```
 
-If the password contains special characters, URL-encode them before putting the value in `DATABASE_URL`.
+`DATABASE_URL` is still supported as a fallback when `READON_DATABASE_NAME` is not set. If the password contains special characters in `DATABASE_URL`, URL-encode them.
 
 The main app needs this to call the service:
 
@@ -85,7 +89,10 @@ comprehension
 Migration runner:
 
 ```bash
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/comprehension \
+READON_DATABASE_NAME=comprehension \
+READON_DATABASE_HOST=localhost \
+READON_DATABASE_USER=readon \
+READON_DATABASE_PASSWORD=REPLACE_ME \
 node microservices/comprehension-service/db/migrate.js
 ```
 
@@ -109,14 +116,18 @@ microservices/comprehension-service/db/migrations/
 From the repo root, apply migrations:
 
 ```bash
-DATABASE_URL=postgresql://kuhoos@localhost:5432/comprehension \
+READON_DATABASE_NAME=comprehension \
+READON_DATABASE_HOST=localhost \
+READON_DATABASE_USER=kuhoos \
 node microservices/comprehension-service/db/migrate.js
 ```
 
 Start the service:
 
 ```bash
-DATABASE_URL=postgresql://kuhoos@localhost:5432/comprehension \
+READON_DATABASE_NAME=comprehension \
+READON_DATABASE_HOST=localhost \
+READON_DATABASE_USER=kuhoos \
 HOST=127.0.0.1 \
 PORT=18080 \
 node microservices/comprehension-service/server.js
@@ -143,7 +154,7 @@ Cloud SQL database:
 comprehension
 ```
 
-The service needs a working `DATABASE_URL` at runtime. For Cloud Run, prefer Secret Manager or Cloud Run environment variables rather than committing credentials.
+The service needs `READON_DATABASE_NAME=comprehension` at runtime. With Cloud Run Cloud SQL connectivity, `CLOUDSQL_CONNECTION_NAME` is mounted at `/cloudsql/<connection-name>` and is used as the socket host when `READON_DATABASE_HOST` is not set. Provide `READON_DATABASE_USER` and `READON_DATABASE_PASSWORD` through Secret Manager or Cloud Run environment variables rather than committing credentials.
 
 For public-IP local access to Cloud SQL, the client IP must be authorized in Cloud SQL authorized networks. If direct public-IP access times out, use one of these instead:
 
@@ -170,7 +181,9 @@ Fallback demo:
 ```bash
 READON_COMPREHENSION_CIRCUIT_BREAKER_FAILURE_THRESHOLD=1 \
 READON_COMPREHENSION_LLM_ENDPOINT= \
-DATABASE_URL=postgresql://kuhoos@localhost:5432/comprehension \
+READON_DATABASE_NAME=comprehension \
+READON_DATABASE_HOST=localhost \
+READON_DATABASE_USER=kuhoos \
 HOST=127.0.0.1 \
 PORT=18080 \
 node microservices/comprehension-service/server.js

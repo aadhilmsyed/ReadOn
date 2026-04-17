@@ -2,24 +2,54 @@ const { Pool } = require('pg');
 
 let pool;
 
-function databaseUrl() {
-  return process.env.DATABASE_URL || '';
+function readEnv(name) {
+  const value = process.env[name] || '';
+  return value === 'REPLACE_ME' ? '' : value;
 }
 
-function createMissingDatabaseUrlError() {
-  const err = new Error('DATABASE_URL is required for Comprehension persistence.');
-  err.code = 'DATABASE_URL_MISSING';
+function readNumberEnv(name, defaultValue) {
+  const value = Number(readEnv(name));
+  return Number.isFinite(value) ? value : defaultValue;
+}
+
+function databaseConfig() {
+  const cloudSqlConnectionName = readEnv('CLOUDSQL_CONNECTION_NAME');
+  const host = readEnv('READON_DATABASE_HOST') || process.env.PGHOST || (
+    cloudSqlConnectionName ? `/cloudsql/${cloudSqlConnectionName}` : ''
+  );
+  const database = readEnv('READON_DATABASE_NAME');
+
+  if (database) {
+    return {
+      database,
+      host: host || undefined,
+      port: readNumberEnv('READON_DATABASE_PORT', Number(process.env.PGPORT || 5432)),
+      user: readEnv('READON_DATABASE_USER') || process.env.PGUSER || undefined,
+      password: readEnv('READON_DATABASE_PASSWORD') || process.env.PGPASSWORD || undefined,
+    };
+  }
+
+  const connectionString = readEnv('DATABASE_URL');
+
+  return connectionString ? { connectionString } : null;
+}
+
+function createMissingDatabaseConfigError() {
+  const err = new Error('READON_DATABASE_NAME or DATABASE_URL is required for Comprehension persistence.');
+  err.code = 'DATABASE_CONFIG_MISSING';
   return err;
 }
 
 function getPool() {
-  if (!databaseUrl()) {
-    throw createMissingDatabaseUrlError();
+  const config = databaseConfig();
+
+  if (!config) {
+    throw createMissingDatabaseConfigError();
   }
 
   if (!pool) {
     pool = new Pool({
-      connectionString: databaseUrl(),
+      ...config,
       max: Number(process.env.READON_DATABASE_POOL_SIZE || 5),
       connectionTimeoutMillis: Number(process.env.READON_DATABASE_CONNECT_TIMEOUT_MS || 10000),
     });
@@ -49,11 +79,11 @@ async function transaction(callback) {
 }
 
 async function verifyDatabaseConnection() {
-  if (!databaseUrl()) {
+  if (!databaseConfig()) {
     return {
       ok: false,
-      code: 'DATABASE_URL_MISSING',
-      message: 'DATABASE_URL is not configured; Comprehension persistence endpoints will return persistence_error.',
+      code: 'DATABASE_CONFIG_MISSING',
+      message: 'READON_DATABASE_NAME or DATABASE_URL is not configured; Comprehension persistence endpoints will return persistence_error.',
     };
   }
 
@@ -74,6 +104,7 @@ async function verifyDatabaseConnection() {
 }
 
 module.exports = {
+  databaseConfig,
   getPool,
   query,
   transaction,
