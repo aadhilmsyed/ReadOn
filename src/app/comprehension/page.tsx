@@ -1,5 +1,5 @@
-import { FeaturePage } from '@views/features/FeaturePage';
+import { ComprehensionPage } from '@views/features/ComprehensionPage';
 
 export default function Page() {
-  return <FeaturePage featureKey="comprehension" />;
+  return <ComprehensionPage />;
 }

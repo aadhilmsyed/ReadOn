@@ -29,32 +29,37 @@ function notImplementedResponse(serviceName, path) {
   };
 }
 
-function createReadOnHttpServer({ serviceName }) {
+function createReadOnHttpServer({ serviceName, routeHandler }) {
   const serviceVersion = process.env.SERVICE_VERSION || 'unknown';
   const logger = createLogger({ serviceName, serviceVersion });
 
   const requireDbMount = parseBooleanEnv('READON_READY_REQUIRE_CLOUDSQL_MOUNT', false);
   const cloudSqlConnectionName = process.env.CLOUDSQL_CONNECTION_NAME || '';
 
-  return http.createServer((req, res) => {
+  return http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const path = url.pathname || '/';
 
     logger.info('request', { method: req.method, path });
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      return sendJson(res, 405, { error: 'method_not_allowed' });
-    }
-
     if (path === '/health') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return sendJson(res, 405, { error: 'method_not_allowed' });
+      }
       return sendJson(res, 200, { status: 'ok', service: serviceName, version: serviceVersion, now: new Date().toISOString() });
     }
 
     if (path === '/live') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return sendJson(res, 405, { error: 'method_not_allowed' });
+      }
       return sendJson(res, 200, { status: 'ok', path: '/live', service: serviceName, version: serviceVersion, now: new Date().toISOString() });
     }
 
     if (path === '/meta') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return sendJson(res, 405, { error: 'method_not_allowed' });
+      }
       return sendJson(res, 200, {
         service: serviceName,
         version: serviceVersion,
@@ -64,6 +69,9 @@ function createReadOnHttpServer({ serviceName }) {
     }
 
     if (path === '/ready') {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        return sendJson(res, 405, { error: 'method_not_allowed' });
+      }
       if (requireDbMount && cloudSqlConnectionName) {
         try {
           // eslint-disable-next-line no-var-requires
@@ -100,16 +108,42 @@ function createReadOnHttpServer({ serviceName }) {
       });
     }
 
+    if (routeHandler) {
+      try {
+        const handled = await routeHandler({
+          req,
+          res,
+          url,
+          path,
+          sendJson,
+          logger,
+          serviceName,
+          serviceVersion,
+        });
+
+        if (handled) {
+          return;
+        }
+      } catch (err) {
+        logger.error('route_handler_failed', err, { path });
+        return sendJson(res, 500, { error: 'internal_error' });
+      }
+    }
+
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return sendJson(res, 405, { error: 'method_not_allowed' });
+    }
+
     // For now, the skeleton exposes only operational endpoints.
     return sendJson(res, 501, notImplementedResponse(serviceName, path));
   });
 }
 
-function startReadOnService({ serviceName }) {
+function startReadOnService({ serviceName, routeHandler }) {
   const port = Number(process.env.PORT || 8080);
   const host = process.env.HOST || '0.0.0.0';
 
-  const server = createReadOnHttpServer({ serviceName });
+  const server = createReadOnHttpServer({ serviceName, routeHandler });
   server.listen(port, host, () => {
     // eslint-disable-next-line no-console
     console.log(
@@ -129,4 +163,3 @@ function startReadOnService({ serviceName }) {
 }
 
 module.exports = { startReadOnService };
-
