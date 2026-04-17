@@ -1,3 +1,9 @@
+# UPDATE NOTE
+Sigrid is now enabled for this repo.
+You have new GitHub Actions workflow files.
+You will receive a Sigrid invitation shortly - accept it and review the architecture analysis of your repo as part of the project documentation assignment. There's no need to improve the codebase or architecture when working on the implementation. 
+Visit Sigrid at https://sigrid-says.com/cmusvfse
+
 # Read On
 
 Read On is a reading support platform designed to help learners engage with text through pronunciation support, comprehension activities, visualization workflows, and read-aloud experiences. This repository has been refactored into an architecture-aligned scaffold for Carnegie Mellon 18-653 so a new team can rebuild backend capabilities from a clean foundation while preserving the current frontend stack and navigable product shell.
