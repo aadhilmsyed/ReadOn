@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Heading,
@@ -19,8 +20,19 @@ import { useText } from '@views/providers/TextProvider';
 const CHARACTER_LIMIT = 3500;
 
 export default function HomePage() {
+  const router = useRouter();
   const { inputText, setInputText } = useText();
   const overLimit = inputText.length > CHARACTER_LIMIT;
+
+  const launchAudiobook = () => {
+    const trimmed = inputText.trim();
+    if (trimmed) {
+      sessionStorage.setItem('audiobook:sourceText', trimmed);
+      router.push('/audiobook/player');
+      return;
+    }
+    router.push('/audiobook');
+  };
 
   return (
     <AppShell>
@@ -95,6 +107,7 @@ export default function HomePage() {
                 title={feature.title}
                 description={feature.shortDescription}
                 icon={feature.icon}
+                onNavigate={feature.key === 'audiobook' ? launchAudiobook : undefined}
               />
             ))}
           </SimpleGrid>
