@@ -1,7 +1,12 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
+  AlertDescription,
+  AlertIcon,
   Box,
   Heading,
   HStack,
@@ -11,6 +16,10 @@ import {
   VStack,
 } from '@chakra-ui/react';
 
+import {
+  PHONICS_SESSION_HOME_FLASH_ERROR_KEY,
+  PHONICS_SESSION_STORY_TEXT_KEY,
+} from '@shared/constants/phonicsClient';
 import { featureDefinitions } from '@shared/content/features';
 import { FeatureCard } from '@views/components/FeatureCard';
 import { AppShell } from '@views/components/AppShell';
@@ -19,8 +28,31 @@ import { useText } from '@views/providers/TextProvider';
 const CHARACTER_LIMIT = 3500;
 
 export default function HomePage() {
+  const router = useRouter();
   const { inputText, setInputText } = useText();
   const overLimit = inputText.length > CHARACTER_LIMIT;
+  const [phonicsInputError, setPhonicsInputError] = useState<string | null>(null);
+  const [phonicsFlashError, setPhonicsFlashError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const msg = sessionStorage.getItem(PHONICS_SESSION_HOME_FLASH_ERROR_KEY);
+    if (msg) {
+      setPhonicsFlashError(msg);
+      sessionStorage.removeItem(PHONICS_SESSION_HOME_FLASH_ERROR_KEY);
+    }
+  }, []);
+
+  const handlePhonicsPractice = useCallback(() => {
+    const trimmed = inputText.trim();
+    if (!trimmed) {
+      setPhonicsInputError('Add some reading text in the box above before starting Phonics Practice.');
+      return;
+    }
+    setPhonicsInputError(null);
+    sessionStorage.setItem(PHONICS_SESSION_STORY_TEXT_KEY, trimmed);
+    router.push('/phonics');
+  }, [inputText, router]);
 
   return (
     <AppShell>
@@ -66,12 +98,28 @@ export default function HomePage() {
               placeholder="Type or paste your text here..."
               size="lg"
               value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
+              onChange={(event) => {
+                setInputText(event.target.value);
+                if (phonicsInputError) setPhonicsInputError(null);
+              }}
               minHeight="300px"
               resize="vertical"
               borderColor={overLimit ? 'red.400' : 'gray.200'}
               _focus={{ borderColor: overLimit ? 'red.500' : 'blue.400', boxShadow: 'none' }}
             />
+            {(phonicsInputError || phonicsFlashError) && (
+              <Alert
+                status="error"
+                borderRadius="lg"
+                variant="subtle"
+                bg="red.50"
+                borderWidth="1px"
+                borderColor="red.100"
+              >
+                <AlertIcon />
+                <AlertDescription color="gray.700">{phonicsInputError ?? phonicsFlashError}</AlertDescription>
+              </Alert>
+            )}
             <HStack justify="space-between" flexWrap="wrap">
               <Text fontSize="sm" color={overLimit ? 'red.500' : 'gray.500'}>
                 {inputText.length}/{CHARACTER_LIMIT} characters
@@ -95,6 +143,7 @@ export default function HomePage() {
                 title={feature.title}
                 description={feature.shortDescription}
                 icon={feature.icon}
+                onNavigate={feature.key === 'phonics' ? handlePhonicsPractice : undefined}
               />
             ))}
           </SimpleGrid>

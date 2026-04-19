@@ -1,0 +1,4 @@
+# Environment files with secrets — excluded from Cursor indexing and AI context.
+# `.env.example` files remain readable (they are templates, not live secrets).
+.env
+**/.env
