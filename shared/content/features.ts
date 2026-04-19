@@ -65,7 +65,7 @@ export const featureDefinitions: FeatureCardDefinition[] = [
   {
     key: 'audiobook',
     route: '/audiobook',
-    title: 'Read Aloud',
+    title: 'Audiobook',
     shortDescription: 'Retain the listening experience layout for future narration, playback, and follow-along support.',
     heroDescription:
       'Playback controls and progress visuals stay in place for demos while text-to-speech generation and audio delivery remain intentionally unimplemented.',
