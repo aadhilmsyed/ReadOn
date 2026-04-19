@@ -1,0 +1,20 @@
+name: Deploy ReadOn
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-reusable.yml
+    with:
+      readon_deploy_env: ${{ github.ref_name == 'main' && 'prod' || 'test' }}
+      gcp_project_id: ${{ vars.GCP_PROJECT_ID }}
+      workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+      service_account: ${{ github.ref_name == 'main' && vars.CICD_SERVICE_ACCOUNT_PROD || vars.CICD_SERVICE_ACCOUNT_TEST }}

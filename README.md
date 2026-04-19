@@ -100,16 +100,13 @@ Each microservice directory is intentionally implementation-pending. Route handl
 
 This keeps the codebase ready for teammates to add real APIs, storage, data models, and service coordination without inheriting previous implementation constraints.
 
-## Future Infrastructure Direction
+## Google Cloud Deployment (Skeleton Infra)
 
-This refactor does not add deployment or infrastructure files yet, but the codebase is being organized to support a future Google Cloud deployment path.
+This repository includes infrastructure wiring (containerization, Cloud Run deployment scaffolding, health endpoints, and operational config plumbing) while keeping all feature/business logic intentionally stubbed.
 
-Expected future directions include:
+- **Ops scripts:** `ops/gcp/README.md` — provision, prod/test deploy, verify.
+- **Dual environment:** same project; `dev` branch → test Cloud Run services, `main` → prod ([docs/environment-separation.md](docs/environment-separation.md)).
+- **CI/CD:** GitHub Actions + Workload Identity Federation ([docs/cicd-overview.md](docs/cicd-overview.md)).
+- **Config template:** `.env.example`
 
-- application deployment on Google Cloud
-- managed relational storage such as Cloud SQL
-- object storage for generated assets and media
-- Redis-compatible caching for orchestration and session workloads
-- test and production deployment automation
-
-The current separation between views, orchestrators, microservices, and shared interfaces is intended to make those future GCP integrations straightforward.
+Planned or partial future pieces (not fully productized here) include Redis/Memorystore and richer service auth beyond the skeleton.

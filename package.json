@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:comprehension": "node --test microservices/comprehension-service/tests/**/*.test.js",
     "phonics:db:bootstrap": "npx tsx microservices/phonics-service/scripts/bootstrap-db.ts",
     "phonics:db:reset": "npx tsx microservices/phonics-service/scripts/reset-phonics-schema.ts"
   },
