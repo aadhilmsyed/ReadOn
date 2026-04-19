@@ -1,7 +1,11 @@
-import { buildAudiobookModel } from '../models/audiobookModel';
-import { notImplemented } from '@shared/notImplemented';
+import { parseAudiobookNarrationRequest } from '../models/audiobookModel';
+import { synthesizeNarration } from '../services/audiobookService';
 
-export async function handleAudiobookRequest() {
-  buildAudiobookModel();
-  return notImplemented('audiobook-service controller');
+/**
+ * Entry point for narration: validate body → TTS → structured result.
+ * Callers map `AudiobookNarrationResult` to HTTP (binary audio) or internal queues.
+ */
+export async function handleAudiobookRequest(body: unknown) {
+  const request = parseAudiobookNarrationRequest(body);
+  return synthesizeNarration(request);
 }

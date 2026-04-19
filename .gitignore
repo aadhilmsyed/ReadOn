@@ -30,7 +30,8 @@ yarn-error.log*
 .env
 **/.env
 
-# GCP service account key files (local credentials)
+# GCP credentials (local)
+/credentials/google-application-credentials.json
 microservices/audiobook-service/google-tts-service-account.json
 
 # vercel

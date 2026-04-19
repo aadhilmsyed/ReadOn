@@ -13,15 +13,15 @@ export function FeatureCard({
   title: string;
   description: string;
   icon: IconType;
-  /** When set, click is handled here instead of navigating to `href`. */
-  onNavigate?: () => void;
+  /** When set, navigation is handled in JS (e.g. stash text then route). */
+  onNavigate?: () => void | Promise<void>;
 }) {
   const shared = {
     height: 'auto' as const,
     p: 8,
     colorScheme: 'blue' as const,
     variant: 'outline' as const,
-    width: '100%',
+    width: '100%' as const,
     minH: '220px',
     whiteSpace: 'normal' as const,
     textAlign: 'center' as const,

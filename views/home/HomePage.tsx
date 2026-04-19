@@ -54,6 +54,16 @@ export default function HomePage() {
     router.push('/phonics');
   }, [inputText, router]);
 
+  const launchAudiobook = () => {
+    const trimmed = inputText.trim();
+    if (trimmed) {
+      sessionStorage.setItem('audiobook:sourceText', trimmed);
+      router.push('/audiobook/player');
+      return;
+    }
+    router.push('/audiobook');
+  };
+
   return (
     <AppShell>
       <VStack spacing={12} align="stretch">
@@ -143,7 +153,13 @@ export default function HomePage() {
                 title={feature.title}
                 description={feature.shortDescription}
                 icon={feature.icon}
-                onNavigate={feature.key === 'phonics' ? handlePhonicsPractice : undefined}
+                onNavigate={
+                  feature.key === 'phonics'
+                    ? handlePhonicsPractice
+                    : feature.key === 'audiobook'
+                      ? launchAudiobook
+                      : undefined
+                }
               />
             ))}
           </SimpleGrid>

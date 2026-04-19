@@ -1,5 +1,5 @@
-import { FeaturePage } from '@views/features/FeaturePage';
+import { AudiobookFeaturePage } from '@views/features/AudiobookFeaturePage';
 
 export default function Page() {
-  return <FeaturePage featureKey="audiobook" />;
+  return <AudiobookFeaturePage />;
 }
