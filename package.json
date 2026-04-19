@@ -9,7 +9,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:comprehension": "node --test microservices/comprehension-service/tests/**/*.test.js",
+    "test:comprehension": "node --test microservices/comprehension-service/tests/unit/circuitBreaker.test.js",
     "phonics:db:bootstrap": "npx tsx microservices/phonics-service/scripts/bootstrap-db.ts",
     "phonics:db:reset": "npx tsx microservices/phonics-service/scripts/reset-phonics-schema.ts"
   },

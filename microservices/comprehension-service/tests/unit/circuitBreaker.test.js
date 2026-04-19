@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { CircuitBreaker } = require('./circuitBreaker');
+const { CircuitBreaker } = require('../../services/circuitBreaker');
 
 function failingOperation(code) {
   return async () => {
