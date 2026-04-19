@@ -75,7 +75,7 @@ export default function DashboardPage() {
     setHistoryError(null);
     (async () => {
       try {
-        const res = await fetch('/api/dashboard/history?limit=5', { cache: 'no-store' });
+        const res = await fetch('/api/dashboard/history?limit=5', { cache: 'no-store', credentials: 'include' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const agg = (await res.json()) as AggregatedHistory;
         if (!cancelled) setHistory(agg);
@@ -93,7 +93,10 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/dashboard/credits/${encodeURIComponent(session.user.email)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/dashboard/credits/${encodeURIComponent(session.user.email)}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const body = await res.json();
         if (!cancelled) { setBalance(body.balance); setBalanceError(null); }
@@ -115,6 +118,7 @@ export default function DashboardPage() {
       const res = await fetch(`/api/dashboard/credits/${encodeURIComponent(session.user.email)}/recharge`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ dollars }),
       });
       const body = await res.json();
@@ -150,7 +154,7 @@ export default function DashboardPage() {
         <HStack justify="space-between" flexWrap="wrap" gap={4}>
           <Box>
             <Heading as="h1" size="lg" color="blue.600">Welcome back, {session.user.name}</Heading>
-            <Text color="gray.600">Mock session token: {session.token}</Text>
+            <Text color="gray.600">Signed in securely. Credits and history load from your account.</Text>
           </Box>
           <Button colorScheme="purple" variant="outline" onClick={() => router.push('/')}>
             New Reading

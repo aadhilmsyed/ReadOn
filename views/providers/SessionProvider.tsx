@@ -1,52 +1,54 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-import {
-  clearClientSession,
-  getClientSession,
-  performMockAuth,
-  type AuthMode,
-} from '@orchestrators/auth/authSessionOrchestrator';
 import type { SessionRecord, SessionUser } from '@shared/types/session';
 
 interface SessionContextValue {
   session: SessionRecord | null;
   isReady: boolean;
-  authenticate: (mode: AuthMode, user: SessionUser) => Promise<SessionRecord>;
-  signOut: () => void;
-  refreshSession: () => void;
+  refreshSession: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [isReady, setIsReady] = useState(false);
 
-  const refreshSession = useCallback(() => {
-    setSession(getClientSession());
-    setIsReady(true);
+  const refreshSession = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+      const data = (await res.json()) as { authenticated?: boolean; user?: SessionUser };
+      if (data.authenticated && data.user?.email) {
+        setSession({ user: { email: data.user.email, name: data.user.name } });
+      } else {
+        setSession(null);
+      }
+    } catch {
+      setSession(null);
+    } finally {
+      setIsReady(true);
+    }
   }, []);
 
   useEffect(() => {
-    refreshSession();
+    void refreshSession();
   }, [refreshSession]);
 
-  const authenticate = useCallback(async (mode: AuthMode, user: SessionUser) => {
-    const nextSession = await performMockAuth(mode, user);
-    setSession(nextSession);
-    return nextSession;
-  }, []);
-
-  const signOut = useCallback(() => {
-    clearClientSession();
+  const signOut = useCallback(async () => {
+    await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' });
     setSession(null);
-  }, []);
+    router.push('/');
+    router.refresh();
+  }, [router]);
 
   const value = useMemo(
-    () => ({ session, isReady, authenticate, signOut, refreshSession }),
-    [authenticate, isReady, refreshSession, session, signOut],
+    () => ({ session, isReady, refreshSession, signOut }),
+    [isReady, refreshSession, session, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

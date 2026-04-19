@@ -16,10 +16,12 @@ function errorBody(code: string, message: string, retryable: boolean, details: A
   };
 }
 
-function comprehensionServiceUrl(path: string) {
-  const baseUrl = process.env.READON_COMPREHENSION_SERVICE_URL;
+const DEFAULT_COMPREHENSION_URL = 'http://127.0.0.1:8080';
 
-  if (!baseUrl) {
+function comprehensionServiceUrl(path: string) {
+  const baseUrl = (process.env.READON_COMPREHENSION_SERVICE_URL || DEFAULT_COMPREHENSION_URL).trim();
+
+  if (!baseUrl || baseUrl === 'REPLACE_ME' || baseUrl === 'NULL') {
     return null;
   }
 
@@ -33,7 +35,7 @@ export async function forwardComprehensionRequest(path: string, init: RequestIni
     return NextResponse.json(
       errorBody(
         'service_url_not_configured',
-        'READON_COMPREHENSION_SERVICE_URL is not configured.',
+        'READON_COMPREHENSION_SERVICE_URL is not set to a reachable URL (default is http://127.0.0.1:8080).',
         false,
       ),
       { status: 503 },
@@ -52,6 +54,7 @@ export async function forwardComprehensionRequest(path: string, init: RequestIni
       ...init,
       headers,
       cache: 'no-store',
+      signal: AbortSignal.timeout(Number(process.env.READON_COMPREHENSION_FETCH_TIMEOUT_MS ?? 60000)),
     });
 
     const contentType = response.headers.get('content-type') || '';

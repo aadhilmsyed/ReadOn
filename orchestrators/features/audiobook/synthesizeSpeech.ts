@@ -26,10 +26,18 @@ function validateSourceText(sourceText: string): string {
 }
 
 function resolveCredentialsPath() {
-  return (
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ??
-    path.join(process.cwd(), 'credentials', 'google-application-credentials.json')
-  );
+  const explicit = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  if (explicit) {
+    return path.isAbsolute(explicit) ? explicit : path.join(process.cwd(), explicit);
+  }
+  const candidates = [
+    path.join(process.cwd(), 'credentials', 'google-application-credentials.json'),
+    path.join(process.cwd(), 'microservices', 'audiobook-service', 'google-tts-service-account.json'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return candidates[0];
 }
 
 export async function synthesizeAudiobookSpeech(sourceText: string): Promise<AudiobookSpeechResult> {

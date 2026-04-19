@@ -3,6 +3,7 @@
  * then forwards to the phonics microservice controller.
  * Clients may omit `storyId`; optional `storyId` is preserved for tests / legacy callers.
  */
+import '../loadPhonicsEnv';
 import { randomUUID } from 'crypto';
 
 import { NextResponse } from 'next/server';

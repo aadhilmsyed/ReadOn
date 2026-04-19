@@ -1,3 +1,4 @@
+import '../loadAudiobookEnv';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { requestFeatureProcessing } from '@orchestrators/features/featureActionOrchestrator';

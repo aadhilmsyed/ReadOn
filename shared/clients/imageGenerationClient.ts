@@ -25,8 +25,12 @@ export interface ImageGenerationClientConfig {
 const DEFAULT_TIMEOUT_MS = 45000;
 const DEFAULT_MAX_RETRIES = 1;
 
+/** Same-origin BFF proxy — keeps service URL and keys on the server. */
 function getImageServiceUrl(): string {
-  return process.env.NEXT_PUBLIC_IMAGE_GENERATION_SERVICE_URL || 'http://localhost:3001';
+  if (typeof window === 'undefined') {
+    return '/api/images/generate';
+  }
+  return '/api/images/generate';
 }
 
 function sleep(ms: number): Promise<void> {

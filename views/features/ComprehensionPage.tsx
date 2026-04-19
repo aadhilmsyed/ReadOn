@@ -180,6 +180,7 @@ export function ComprehensionPage() {
 
     try {
       const response = await fetch('/api/comprehension/history', {
+        credentials: 'include',
         headers: contextHeaders(),
       });
       const body = await response.json();
@@ -225,6 +226,7 @@ export function ComprehensionPage() {
     try {
       const response = await fetch('/api/comprehension/questions', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'content-type': 'application/json', ...contextHeaders() },
         body: JSON.stringify({
           sourceText,
@@ -260,6 +262,7 @@ export function ComprehensionPage() {
     try {
       const response = await fetch(`/api/comprehension/questions/${encodeURIComponent(result.resultId)}/answers`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'content-type': 'application/json', ...contextHeaders() },
         body: JSON.stringify({
           answers: Object.entries(selectedAnswers).map(([questionId, selectedChoiceId]) => ({

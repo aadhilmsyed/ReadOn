@@ -4,6 +4,7 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
     include: [
       'microservices/phonics-service/tests/unit/**/*.test.ts',
       'microservices/phonics-service/tests/integration/**/*.test.ts',
@@ -14,6 +15,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@': path.resolve(__dirname, 'src'),
       '@phonics': path.resolve(__dirname, 'microservices/phonics-service'),
       '@shared': path.resolve(__dirname, 'shared'),
       '@orchestrators': path.resolve(__dirname, 'orchestrators'),

@@ -1,6 +1,7 @@
 /**
  * TEMPORARY LOCAL UAT — forwards to phonics microservice controller.
  */
+import '../../loadPhonicsEnv';
 import { NextResponse } from 'next/server';
 
 import { handleGetStoryPhonics } from '@phonics/routes/handlers';

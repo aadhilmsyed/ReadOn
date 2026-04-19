@@ -59,6 +59,7 @@ export function AudiobookPlaybackPage() {
         const res = await fetch('/api/audiobook/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ text: sourceText }),
         });
 

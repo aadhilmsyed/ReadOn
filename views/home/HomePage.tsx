@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -7,12 +8,20 @@ import {
   Alert,
   AlertDescription,
   AlertIcon,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Box,
+  Button,
   Heading,
   HStack,
   SimpleGrid,
   Text,
   Textarea,
+  useDisclosure,
   VStack,
 } from '@chakra-ui/react';
 
@@ -24,6 +33,7 @@ import { featureDefinitions } from '@shared/content/features';
 import type { FeatureKey } from '@shared/types/features';
 import { FeatureCard } from '@views/components/FeatureCard';
 import { AppShell } from '@views/components/AppShell';
+import { useSession } from '@views/providers/SessionProvider';
 import { useText } from '@views/providers/TextProvider';
 
 const CHARACTER_LIMIT = 3500;
@@ -33,6 +43,9 @@ export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { inputText, setInputText } = useText();
+  const { session, isReady } = useSession();
+  const authDialog = useDisclosure();
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
   const overLimit = inputText.length > CHARACTER_LIMIT;
   const [phonicsInputError, setPhonicsInputError] = useState<string | null>(null);
   const [phonicsFlashError, setPhonicsFlashError] = useState<string | null>(null);
@@ -54,7 +67,10 @@ export default function HomePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/dashboard/stories/${service}/${storyId}`, { cache: 'no-store' });
+        const res = await fetch(`/api/dashboard/stories/${service}/${storyId}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        });
         if (!res.ok) return;
         const story = await res.json();
         if (cancelled) return;
@@ -80,7 +96,7 @@ export default function HomePage() {
     router.push('/phonics');
   }, [inputText, router]);
 
-  const launchAudiobook = () => {
+  const launchAudiobook = useCallback(() => {
     const trimmed = inputText.trim();
     if (trimmed) {
       sessionStorage.setItem('audiobook:sourceText', trimmed);
@@ -88,7 +104,33 @@ export default function HomePage() {
       return;
     }
     router.push('/audiobook');
-  };
+  }, [router, inputText]);
+
+  const gateFeature = useCallback(
+    (run: () => void) => {
+      if (!isReady) return;
+      if (!session) {
+        authDialog.onOpen();
+        return;
+      }
+      run();
+    },
+    [authDialog, isReady, session],
+  );
+
+  const handleFeatureNavigate = useCallback(
+    (key: FeatureKey) => {
+      gateFeature(() => {
+        if (key === 'phonics') handlePhonicsPractice();
+        else if (key === 'audiobook') launchAudiobook();
+        else {
+          const route = featureDefinitions.find((f) => f.key === key)?.route;
+          if (route) router.push(route);
+        }
+      });
+    },
+    [gateFeature, handlePhonicsPractice, launchAudiobook, router],
+  );
 
   return (
     <AppShell>
@@ -154,7 +196,7 @@ export default function HomePage() {
                 {inputText.length}/{CHARACTER_LIMIT} characters
               </Text>
               <Text fontSize="sm" color="gray.500">
-                Navigation remains live even when backend-driven actions are stubbed.
+                Sign in to unlock Phonics, Comprehension, Visualization, and Audiobook.
               </Text>
             </HStack>
           </VStack>
@@ -172,13 +214,7 @@ export default function HomePage() {
                 title={feature.title}
                 description={feature.shortDescription}
                 icon={feature.icon}
-                onNavigate={
-                  feature.key === 'phonics'
-                    ? handlePhonicsPractice
-                    : feature.key === 'audiobook'
-                      ? launchAudiobook
-                      : undefined
-                }
+                onNavigate={() => handleFeatureNavigate(feature.key)}
               />
             ))}
           </SimpleGrid>
@@ -382,6 +418,33 @@ export default function HomePage() {
             </Text>
           </VStack>
         </Box>
+
+        <AlertDialog isOpen={authDialog.isOpen} leastDestructiveRef={cancelRef} onClose={authDialog.onClose}>
+          <AlertDialogOverlay />
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Sign in required
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Create a free account or sign in to use Phonics, Comprehension, Visualization, and Audiobook.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={authDialog.onClose}>
+                Stay here
+              </Button>
+              <Button
+                colorScheme="blue"
+                onClick={() => {
+                  authDialog.onClose();
+                  router.push('/auth');
+                }}
+                ml={3}
+              >
+                Go to Sign In
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </VStack>
     </AppShell>
   );

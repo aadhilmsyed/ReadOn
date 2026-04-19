@@ -3,10 +3,9 @@ export interface SessionUser {
   email: string;
 }
 
+/** Browser-visible session (JWT lives in HttpOnly cookie). */
 export interface SessionRecord {
-  token: string;
   user: SessionUser;
-  issuedAt: string;
 }
 
 export interface SessionStrategy {

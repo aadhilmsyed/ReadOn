@@ -5,12 +5,8 @@
 
 import { getAggregatedHistory } from './composition/getAggregatedHistory';
 import { getStory }             from './clients/storyActionsClient';
-import {
-  getCreditBalance,
-  rechargeCredits,
-  type CreditBalance,
-  type RechargeResult,
-} from './clients/creditsClient';
+import type { CreditBalance, RechargeResult } from './clients/creditsClient';
+import { getCreditBalanceUnified, rechargeCreditsUnified } from './creditsUnified';
 
 import type { FeatureKey } from '@shared/types/features';
 import type { AggregatedHistory, FullStory } from './composition/types';
@@ -24,9 +20,9 @@ export async function fetchStory(feature: FeatureKey, storyId: string): Promise<
 }
 
 export async function fetchCreditBalance(userId: string): Promise<CreditBalance> {
-  return getCreditBalance(userId);
+  return getCreditBalanceUnified(userId);
 }
 
 export async function rechargeUserCredits(userId: string, dollars: number): Promise<RechargeResult> {
-  return rechargeCredits(userId, dollars);
+  return rechargeCreditsUnified(userId, dollars);
 }

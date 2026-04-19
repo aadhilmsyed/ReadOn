@@ -87,6 +87,7 @@ export function PhonicsPracticePage() {
         const res = await fetch('/api/phonics/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ storyText }),
         });
         const json = (await res.json()) as {

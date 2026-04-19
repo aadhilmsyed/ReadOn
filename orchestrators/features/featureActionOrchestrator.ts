@@ -5,7 +5,7 @@
 import type { FeatureKey } from '@shared/types/features';
 import { notImplemented } from '@shared/notImplemented';
 import { createStory } from '@orchestrators/dashboard/clients/storyActionsClient';
-import { chargeCredits } from '@orchestrators/dashboard/clients/creditsClient';
+import { chargeCreditsUnified } from '@orchestrators/dashboard/creditsUnified';
 import { DashboardServiceError } from '@orchestrators/dashboard/clients/baseHttpClient';
 
 import { synthesizeAudiobookSpeech } from './audiobook/synthesizeSpeech';
@@ -85,7 +85,7 @@ function validate(req: StartFeatureRequest): void {
 }
 
 function featureCreditCost(): number {
-  const cost = Number(process.env.READON_FEATURE_CREDIT_COST ?? '10');
+  const cost = Number(process.env.READON_FEATURE_CREDIT_COST ?? '5');
   if (!Number.isFinite(cost) || cost < 0) throw new Error('invalid_credit_cost');
   return cost;
 }
@@ -93,10 +93,13 @@ function featureCreditCost(): number {
 async function deductCredits(userId: string, feature: FeatureKey): Promise<number> {
   const cost = featureCreditCost();
   try {
-    const result = await chargeCredits(userId, cost, `feature:${feature}`);
+    const result = await chargeCreditsUnified(userId, cost, `feature:${feature}`);
     return result.balance;
   } catch (err) {
     if (err instanceof DashboardServiceError && err.status === 402) {
+      throw new InsufficientCreditsError(cost);
+    }
+    if (err instanceof Error && (err as Error & { code?: string }).code === 'INSUFFICIENT_CREDITS') {
       throw new InsufficientCreditsError(cost);
     }
     throw err;
