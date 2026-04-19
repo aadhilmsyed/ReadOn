@@ -9,6 +9,7 @@ export interface FeatureActionRequest {
 }
 
 export interface FeatureProcessingResult {
+  sourceText: string;
   audioBuffer: Buffer;
   mimeType: string;
 }
@@ -17,7 +18,8 @@ export async function requestFeatureProcessing(
   request: FeatureActionRequest,
 ): Promise<FeatureProcessingResult> {
   if (request.feature === 'audiobook') {
-    return synthesizeAudiobookSpeech(request.sourceText);
+    const { audioBuffer, mimeType } = await synthesizeAudiobookSpeech(request.sourceText);
+    return { sourceText: request.sourceText, audioBuffer, mimeType };
   }
 
   return notImplemented(`${request.feature} orchestration`);
