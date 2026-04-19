@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Cursor
+.cursorignore
+
 # dependencies
 /node_modules
 /.pnp
@@ -25,9 +28,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# local env files (all paths; do not commit secrets)
 .env*.local
 .env
+**/.env
+
+# GCP service account key files (local credentials)
+microservices/audiobook-service/google-tts-service-account.json
 
 # vercel
 .vercel
