@@ -1,73 +1,60 @@
-import { existsSync } from 'node:fs';
-import path from 'node:path';
-
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-
-/** Same cap as real Google TTS input limits; keeps client and future API aligned. */
-export const AUDIOBOOK_TTS_MAX_BYTES = 5000;
+import { serviceDownMessage, LOCAL_SERVICE_URLS, START_COMMANDS } from '@shared/http/serviceUnavailable';
 
 export interface AudiobookSpeechResult {
   audioBuffer: Buffer;
   mimeType: string;
 }
 
-function validateSourceText(sourceText: string): string {
-  const trimmed = sourceText.trim();
-  if (!trimmed) {
-    throw new Error('Audiobook text is required.');
+function audiobookServiceBaseUrl(): string | null {
+  const raw = process.env.READON_AUDIOBOOK_SERVICE_URL?.trim();
+  if (!raw || raw === 'REPLACE_ME' || raw === 'NULL') {
+    return null;
   }
-  const bytes = Buffer.byteLength(trimmed, 'utf8');
-  if (bytes > AUDIOBOOK_TTS_MAX_BYTES) {
-    throw new Error(
-      `Text is too long for narration (max ${AUDIOBOOK_TTS_MAX_BYTES} UTF-8 bytes; got ${bytes}).`,
-    );
-  }
-  return trimmed;
+  return raw.replace(/\/$/, '');
 }
 
-function resolveCredentialsPath() {
-  const explicit = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
-  if (explicit) {
-    return path.isAbsolute(explicit) ? explicit : path.join(process.cwd(), explicit);
-  }
-  const candidates = [
-    path.join(process.cwd(), 'credentials', 'google-application-credentials.json'),
-    path.join(process.cwd(), 'microservices', 'audiobook-service', 'google-tts-service-account.json'),
-  ];
-  for (const c of candidates) {
-    if (existsSync(c)) return c;
-  }
-  return candidates[0];
-}
-
+/**
+ * Calls the audiobook microservice over HTTP (same contract as `POST /api/audiobook/tts`).
+ * The main app must not import Google TTS directly so local dev matches Cloud Run boundaries.
+ */
 export async function synthesizeAudiobookSpeech(sourceText: string): Promise<AudiobookSpeechResult> {
-  const text = validateSourceText(sourceText);
-  const credentialsPath = resolveCredentialsPath();
+  const base = audiobookServiceBaseUrl();
+  const fallback = LOCAL_SERVICE_URLS.audiobook;
+  const url = `${(base ?? fallback)}/tts`;
 
-  if (!existsSync(credentialsPath)) {
+  const timeoutMs = Number(process.env.READON_AUDIOBOOK_FETCH_TIMEOUT_MS ?? 120000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'audio/mpeg, application/json' },
+      body: JSON.stringify({ text: sourceText }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(Number.isFinite(timeoutMs) ? timeoutMs : 120000),
+    });
+
+    const mimeType = res.headers.get('content-type') || 'audio/mpeg';
+
+    if (!res.ok) {
+      if (mimeType.includes('application/json')) {
+        const body = (await res.json()) as { error?: string };
+        throw new Error(body.error || `Audiobook service returned ${res.status}`);
+      }
+      const text = await res.text();
+      throw new Error(text || `Audiobook service returned ${res.status}`);
+    }
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { audioBuffer: buf, mimeType };
+  } catch (e) {
+    const cause = e instanceof Error ? e.message : String(e);
+    const displayBase = base ?? fallback;
     throw new Error(
-      `Google credentials file not found at "${credentialsPath}". Set GOOGLE_APPLICATION_CREDENTIALS or create credentials/google-application-credentials.json.`,
+      serviceDownMessage(
+        'Audiobook (read-aloud) service',
+        displayBase,
+        START_COMMANDS.audiobook,
+        !base ? `${cause} (set READON_AUDIOBOOK_SERVICE_URL=${fallback} in the repo root .env)` : cause,
+      ),
     );
   }
-
-  const client = new TextToSpeechClient({ keyFilename: credentialsPath });
-  const languageCode = process.env.GOOGLE_TTS_LANGUAGE_CODE ?? 'en-US';
-  const voiceName = process.env.GOOGLE_TTS_VOICE_NAME ?? 'en-US-Neural2-J';
-
-  const [response] = await client.synthesizeSpeech({
-    input: { text },
-    voice: { languageCode, name: voiceName },
-    audioConfig: {
-      audioEncoding: 'MP3',
-      speakingRate: Number(process.env.GOOGLE_TTS_SPEAKING_RATE ?? '1'),
-    },
-  });
-
-  const content = response.audioContent;
-  if (!content) {
-    throw new Error('Google TTS returned no audio content.');
-  }
-
-  const audioBuffer = Buffer.isBuffer(content) ? content : Buffer.from(content as Uint8Array);
-  return { audioBuffer, mimeType: 'audio/mpeg' };
 }
