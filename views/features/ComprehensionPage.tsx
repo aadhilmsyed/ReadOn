@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Alert,
   AlertDescription,
@@ -115,6 +116,9 @@ function choiceLabel(id: ChoiceId) {
 }
 
 export function ComprehensionPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const storyIdParam = (searchParams.get('storyId') ?? '').trim();
   const { inputText } = useText();
   const { isReady, session } = useSession();
   const [result, setResult] = useState<ComprehensionResult | null>(null);
@@ -130,8 +134,10 @@ export function ComprehensionPage() {
   const [questionCount, setQuestionCount] = useState(5);
   const [generationSeconds, setGenerationSeconds] = useState(0);
   const [selectedHistoryAttempt, setSelectedHistoryAttempt] = useState<HistoryAttempt | null>(null);
+  const [packStoryText, setPackStoryText] = useState('');
 
   const sourceText = inputText.trim();
+  const displaySourceText = storyIdParam ? packStoryText.trim() : sourceText;
   const userId = session?.user.email || '';
   const allQuestionsAnswered = result ? result.questions.every((question) => selectedAnswers[question.id]) : false;
   const progressTotal = result?.questions.length || questionCount;
@@ -162,12 +168,51 @@ export function ComprehensionPage() {
       headers['x-readon-user-id'] = userId;
     }
 
-    if (sourceText) {
-      headers['x-readon-story-title'] = buildStoryTitle(sourceText);
+    const textForTitle = displaySourceText || sourceText;
+    if (textForTitle) {
+      headers['x-readon-story-title'] = buildStoryTitle(textForTitle);
     }
 
     return headers;
-  }, [sourceText, userId]);
+  }, [displaySourceText, sourceText, userId]);
+
+  useEffect(() => {
+    if (!storyIdParam || !isReady || !session) {
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      setIsGenerating(true);
+      setErrorMessage('');
+      try {
+        const [storyRes, compRes] = await Promise.all([
+          fetch(`/api/stories/${encodeURIComponent(storyIdParam)}`, { credentials: 'include', cache: 'no-store' }),
+          fetch(`/api/comprehension/story/${encodeURIComponent(storyIdParam)}`, { credentials: 'include', cache: 'no-store' }),
+        ]);
+        if (cancelled) return;
+        if (!storyRes.ok || !compRes.ok) {
+          setErrorMessage('This comprehension activity is not available for your account.');
+          setResult(null);
+          return;
+        }
+        const storyJson = (await storyRes.json()) as { sourceText?: string };
+        const compJson = (await compRes.json()) as ComprehensionResult;
+        if (cancelled) return;
+        if (typeof storyJson.sourceText === 'string') {
+          setPackStoryText(storyJson.sourceText);
+        }
+        setResult(compJson);
+        setSelectedAnswers({});
+      } catch {
+        if (!cancelled) setErrorMessage('Could not load comprehension for this story.');
+      } finally {
+        if (!cancelled) setIsGenerating(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storyIdParam, isReady, session]);
 
   const loadHistory = useCallback(async () => {
     if (!userId) {
@@ -229,7 +274,7 @@ export function ComprehensionPage() {
         credentials: 'include',
         headers: { 'content-type': 'application/json', ...contextHeaders() },
         body: JSON.stringify({
-          sourceText,
+          sourceText: displaySourceText || sourceText,
           questionCount,
           difficulty,
         }),
@@ -379,6 +424,13 @@ export function ComprehensionPage() {
   return (
     <AppShell>
       <VStack spacing={7} align="stretch" maxW="980px" mx="auto">
+        {storyIdParam ? (
+          <HStack>
+            <Button variant="ghost" size="sm" onClick={() => router.push(`/features/${encodeURIComponent(storyIdParam)}`)}>
+              ← Back to story features
+            </Button>
+          </HStack>
+        ) : null}
         <VStack spacing={3} align="center" textAlign="center">
           <Heading as="h1" size="xl" color="blue.700" letterSpacing="0">
             Reading Comprehension
@@ -404,78 +456,95 @@ export function ComprehensionPage() {
           </VStack>
         </Box>
 
-        <Box bg="white" borderRadius="lg" borderWidth="1px" borderColor="gray.200" p={6} shadow="sm">
-          <VStack align="stretch" spacing={4}>
-            <HStack justify="space-between" align="start" flexWrap="wrap" gap={3}>
-              <Box>
-                <Heading as="h2" size="md" color="blue.600">
-                  Current Text
-                </Heading>
-                <Text color="gray.500" fontSize="sm">
-                  Use the text saved from the home page.
-                </Text>
-              </Box>
-            </HStack>
+        {!storyIdParam ? (
+          <Box bg="white" borderRadius="lg" borderWidth="1px" borderColor="gray.200" p={6} shadow="sm">
+            <VStack align="stretch" spacing={4}>
+              <HStack justify="space-between" align="start" flexWrap="wrap" gap={3}>
+                <Box>
+                  <Heading as="h2" size="md" color="blue.600">
+                    Current Text
+                  </Heading>
+                  <Text color="gray.500" fontSize="sm">
+                    Use the text saved from the home page.
+                  </Text>
+                </Box>
+              </HStack>
 
-            {sourceText ? (
-              <Text color="gray.600" noOfLines={5} lineHeight="tall">
-                {sourceText}
+              {sourceText ? (
+                <Text color="gray.600" noOfLines={5} lineHeight="tall">
+                  {sourceText}
+                </Text>
+              ) : (
+                <Alert status="info" borderRadius="lg">
+                  <AlertIcon />
+                  <Box>
+                    <AlertTitle>Add reading text first</AlertTitle>
+                    <AlertDescription>
+                      Go to the home page, paste a story or passage, then come back to generate questions.
+                    </AlertDescription>
+                  </Box>
+                </Alert>
+              )}
+
+              <Stack direction={{ base: 'column', md: 'row' }} spacing={4} align={{ base: 'stretch', md: 'end' }}>
+                <FormControl maxW={{ base: '100%', md: '220px' }}>
+                  <FormLabel color="gray.700">Difficulty</FormLabel>
+                  <Select
+                    value={difficulty}
+                    onChange={(event) => setDifficulty(event.target.value as Difficulty)}
+                    isDisabled={isGenerating}
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl maxW={{ base: '100%', md: '220px' }}>
+                  <FormLabel color="gray.700">Number of questions</FormLabel>
+                  <NumberInput
+                    min={1}
+                    max={10}
+                    value={questionCount}
+                    onChange={(_, value) => setQuestionCount(Number.isFinite(value) ? value : 1)}
+                    isDisabled={isGenerating}
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                </FormControl>
+
+                <Button
+                  colorScheme="blue"
+                  onClick={generateQuestions}
+                  isLoading={isGenerating}
+                  loadingText={generationSeconds >= 8 ? 'Still generating' : 'Generating'}
+                  isDisabled={!sourceText}
+                >
+                  Generate Questions
+                </Button>
+              </Stack>
+            </VStack>
+          </Box>
+        ) : (
+          <Box bg="white" borderRadius="lg" borderWidth="1px" borderColor="gray.200" p={6} shadow="sm">
+            <Heading as="h2" size="md" color="blue.600" mb={2}>
+              Your story
+            </Heading>
+            {displaySourceText ? (
+              <Text color="gray.600" whiteSpace="pre-wrap" lineHeight="tall">
+                {displaySourceText}
               </Text>
             ) : (
-              <Alert status="info" borderRadius="lg">
-                <AlertIcon />
-                <Box>
-                  <AlertTitle>Add reading text first</AlertTitle>
-                  <AlertDescription>
-                    Go to the home page, paste a story or passage, then come back to generate questions.
-                  </AlertDescription>
-                </Box>
-              </Alert>
+              <Text color="gray.500" fontSize="sm">
+                Loading story text…
+              </Text>
             )}
-
-            <Stack direction={{ base: 'column', md: 'row' }} spacing={4} align={{ base: 'stretch', md: 'end' }}>
-              <FormControl maxW={{ base: '100%', md: '220px' }}>
-                <FormLabel color="gray.700">Difficulty</FormLabel>
-                <Select
-                  value={difficulty}
-                  onChange={(event) => setDifficulty(event.target.value as Difficulty)}
-                  isDisabled={isGenerating}
-                >
-                  <option value="easy">Easy</option>
-                  <option value="medium">Medium</option>
-                  <option value="hard">Hard</option>
-                </Select>
-              </FormControl>
-
-              <FormControl maxW={{ base: '100%', md: '220px' }}>
-                <FormLabel color="gray.700">Number of questions</FormLabel>
-                <NumberInput
-                  min={1}
-                  max={10}
-                  value={questionCount}
-                  onChange={(_, value) => setQuestionCount(Number.isFinite(value) ? value : 1)}
-                  isDisabled={isGenerating}
-                >
-                  <NumberInputField />
-                  <NumberInputStepper>
-                    <NumberIncrementStepper />
-                    <NumberDecrementStepper />
-                  </NumberInputStepper>
-                </NumberInput>
-              </FormControl>
-
-              <Button
-                colorScheme="blue"
-                onClick={generateQuestions}
-                isLoading={isGenerating}
-                loadingText={generationSeconds >= 8 ? 'Still generating' : 'Generating'}
-                isDisabled={!sourceText}
-              >
-                Generate Questions
-              </Button>
-            </Stack>
-          </VStack>
-        </Box>
+          </Box>
+        )}
 
         {errorMessage ? (
           <Alert status="error" borderRadius="md">
@@ -488,11 +557,17 @@ export function ComprehensionPage() {
           <VStack py={result ? 4 : 8} spacing={3}>
             <Spinner size="lg" color="blue.500" />
             <Text color="gray.700" fontWeight="medium">
-              {generationSeconds >= 8 ? 'Still generating questions...' : 'Generating questions...'}
+              {storyIdParam
+                ? 'Loading prepared questions...'
+                : generationSeconds >= 8
+                  ? 'Still generating questions...'
+                  : 'Generating questions...'}
             </Text>
-            <Text color="gray.500" fontSize="sm" textAlign="center">
-              Larger or harder question sets can take up to 30 seconds.
-            </Text>
+            {!storyIdParam ? (
+              <Text color="gray.500" fontSize="sm" textAlign="center">
+                Larger or harder question sets can take up to 30 seconds.
+              </Text>
+            ) : null}
           </VStack>
         ) : null}
 
