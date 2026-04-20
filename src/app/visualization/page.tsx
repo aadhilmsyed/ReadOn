@@ -288,6 +288,14 @@ function VisualizationPageInner() {
   const canGoPrevious = visibleSceneIndex > 0;
   const canGoNext = visibleSceneIndex < Math.max(0, scenes.length - 1);
 
+  // Callback when flipbook page changes (mouse drag, touch swipe, or click)
+  function handleFlip(e: { data: number }) {
+    const newPage = e.data;
+    if (typeof newPage === 'number' && newPage >= 0 && newPage < scenes.length) {
+      setVisibleSceneIndex(newPage);
+    }
+  }
+
   function goToScenePage(targetPage: number) {
     const boundedTarget = Math.max(0, Math.min(scenes.length - 1, targetPage));
     const pageFlip = flipBookRef.current?.pageFlip();
@@ -595,6 +603,7 @@ function VisualizationPageInner() {
                   swipeDistance={20}
                   showPageCorners
                   disableFlipByClick
+                  onFlip={handleFlip}
                 >
                   {scenes.map((scene, index) => (
                     <StorybookPage

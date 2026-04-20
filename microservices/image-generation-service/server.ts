@@ -113,14 +113,26 @@ app.get('/images/story/:storyId', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: { message: 'storyId is required' } });
     }
     const rows = await repository.findByStoryId(storyId);
-    const scenes = rows.map((row) => ({
-      generationId: row.id,
-      storyId: row.storyId,
-      imageUrls: row.imageUrls || [],
-      prompt: row.prompt,
-      status: row.status,
-      cached: row.cached,
-    }));
+    const bucketName = process.env.READON_STORAGE_BUCKET || 'readon-492106-assets';
+    
+    const scenes = rows.map((row) => {
+      // Prefer GCS URLs from storageKeys (permanent), fallback to imageUrls (may be expired)
+      let imageUrls = row.imageUrls || [];
+      if (row.storageKeys && row.storageKeys.length > 0) {
+        imageUrls = row.storageKeys.map((key: string) => 
+          `https://storage.googleapis.com/${bucketName}/${key}`
+        );
+      }
+      
+      return {
+        generationId: row.id,
+        storyId: row.storyId,
+        imageUrls,
+        prompt: row.prompt,
+        status: row.status,
+        cached: row.cached,
+      };
+    });
     return res.json({ success: true, storyId, scenes });
   } catch (error) {
     logger.error('Error in /images/story/:storyId', error as Error);
