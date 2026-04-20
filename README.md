@@ -6,7 +6,7 @@ Visit Sigrid at https://sigrid-says.com/cmusvfse
 
 # Read On
 
-Read On is a reading support platform designed to help learners engage with text through pronunciation support, comprehension activities, visualization workflows, and read-aloud experiences. This repository has been refactored into an architecture-aligned scaffold for Carnegie Mellon 18-653 so a new team can rebuild backend capabilities from a clean foundation while preserving the current frontend stack and navigable product shell.
+Read On is a reading support platform designed to help learners engage with text through pronunciation support, comprehension activities, visualization workflows, and read-aloud experiences.
 
 ## Product Vision
 
@@ -147,7 +147,7 @@ This repository includes infrastructure wiring (containerization, Cloud Run depl
 
 - **Ops scripts:** `ops/gcp/README.md` — provision, prod/test deploy, verify.
 - **Dual environment:** same project; `dev` branch → test Cloud Run services, `main` → prod ([docs/environment-separation.md](docs/environment-separation.md)).
-- **CI/CD:** GitHub Actions + Workload Identity Federation ([docs/cicd-overview.md](docs/cicd-overview.md)).
+- **Deploy:** Manual `ops/gcp/` scripts; optional GitHub + WIF if you add your own workflow ([docs/cicd-overview.md](docs/cicd-overview.md)).
 - **Config template:** `.env.example`
 
 Planned or partial future pieces (not fully productized here) include Redis/Memorystore and richer service auth beyond the skeleton.
