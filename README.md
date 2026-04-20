@@ -1,89 +1,78 @@
 # UPDATE NOTE
+
 Sigrid is now enabled for this repo.
 You have new GitHub Actions workflow files.
 You will receive a Sigrid invitation shortly - accept it and review the architecture analysis of your repo as part of the project documentation assignment. There's no need to improve the codebase or architecture when working on the implementation. 
 Visit Sigrid at https://sigrid-says.com/cmusvfse
 
+---
+
 # Read On
 
-Read On is a reading support platform designed to help learners engage with text through pronunciation support, comprehension activities, visualization workflows, and read-aloud experiences.
+Read On is a reading support platform with four learner-facing capabilities:
 
-## Product Vision
+- phonics and pronunciation support
+- reading comprehension activities
+- story visualization
+- audiobook/read-aloud playback
 
-Read On aims to provide a user-centered reading experience that can support different learning preferences in one place:
-
-- phonics and pronunciation support for difficult words
-- reading comprehension activities and feedback
-- visualization support for stories and concepts
-- read-aloud and audiobook-style assistance
-- dashboard and account surfaces for saved work, history, and future personalization
-
-## Current Repository State
-
-The application currently runs as a static Next.js and Chakra UI experience with mock client-side behavior only.
-
-- Frontend routes remain navigable.
-- Text entry is persisted client-side for cross-page continuity.
-- Authentication is represented by a mock local session strategy.
-- Backend-oriented flows are intentionally stubbed and routed through orchestrator interfaces.
-- Real provider integrations, database logic, storage logic, caching logic, and business logic have been removed.
+The app uses a story-centric flow: generate a story once, then access all features by `storyId` from `/features/[storyId]`.
 
 ## Repository Structure
 
 ```text
-.
-├── microservices/
-│   ├── audiobook-service/
-│   ├── comprehension-service/
-│   ├── phonics-service/
-│   ├── image-generation-service/
-│   └── dashboard-service/
-├── orchestrators/
-│   ├── auth/
-│   ├── dashboard/
-│   └── features/
-├── shared/
-│   ├── content/
-│   ├── session/
-│   ├── types/
-│   └── notImplemented.ts
-├── src/app/
-│   └── ... Next.js routes rooted at the repository root
-└── views/
-    ├── auth/
-    ├── components/
-    ├── dashboard/
-    ├── features/
-    ├── home/
-    ├── not-found/
-    └── providers/
+ReadOn/
+├── src/app/             # Next.js routes and API handlers
+├── views/               # UI components and page views
+├── orchestrators/       # BFF/service composition layer
+├── microservices/       # phonics, comprehension, image-generation, audiobook, dashboard
+├── shared/              # shared clients, types, constants
+├── ops/gcp/             # deploy/provision/verify scripts
+└── docs/                # architecture and operations docs
 ```
 
-## Architectural Style
+## Core Architecture
 
-ReadOn follows a **Microservices + Orchestrator (Backend-for-Frontend)** architecture, layered over a Next.js UI and deployed on Google Cloud Run. The top-level directories (`views/`, `orchestrators/`, `microservices/`, `shared/`, `ops/gcp/`) directly reflect this style — each microservice is independently deployable with its own Dockerfile and MVC structure, the orchestrator layer is the single seam through which the UI composes service calls, and infrastructure-as-code is kept separate from application code.
-
-See [docs/architecture.md](docs/architecture.md) for the full architectural style write-up, dependency direction, and rationale.
-
-## Architectural Separation
-
-### `views/`
-Contains UI-facing modules, reusable layout primitives, providers, and route-backed page views. The Next.js app router imports from this layer so page structure remains clean and easy to extend.
-
-### `orchestrators/`
-Contains application-flow coordination interfaces that the frontend can call when an action conceptually belongs to backend behavior. In this scaffold, backend-oriented orchestrator functions remain intentionally stubbed or lightweight where needed for mock navigation.
-
-### `microservices/`
-Contains feature-specific service skeletons organized as lightweight MVC-style service apps. Each microservice includes routes, controllers, models, and optional services placeholders with implementation pending.
-
-### `shared/`
-Contains reusable interfaces, mock content, session abstractions, and common helpers such as the shared `notImplemented()` placeholder used by backend-oriented skeleton code.
+- **Frontend:** Next.js + Chakra UI
+- **Backend-for-Frontend:** orchestrators in the Next app
+- **Services:** independent microservices for each feature area
+- **Data ownership:** story and feature data are loaded by `storyId`, with route-level ownership checks in BFF APIs
 
 ## Running the App (local dev)
 
-The **Next.js app** (orchestrator / BFF) and each **microservice** are separate processes. Configure the repo root `.env` with microservice base URLs (see `.env.example`), and put secrets and DB URLs in each service’s own `.env` under `microservices/<name>/.env`.
+The Next app and microservices run as separate processes.
 
-**Fixed local ports**
+1. Install dependencies:
+
+```bash
+npm install
+npm --prefix microservices/phonics-service install
+npm --prefix microservices/comprehension-service install
+npm --prefix microservices/image-generation-service install
+npm --prefix microservices/audiobook-service install
+npm --prefix microservices/dashboard-service install
+```
+
+2. Copy env templates and configure values:
+
+```bash
+cp .env.example .env
+cp microservices/phonics-service/.env.example microservices/phonics-service/.env
+cp microservices/comprehension-service/.env.example microservices/comprehension-service/.env
+cp microservices/image-generation-service/.env.example microservices/image-generation-service/.env
+cp microservices/audiobook-service/.env.example microservices/audiobook-service/.env
+cp microservices/dashboard-service/.env.example microservices/dashboard-service/.env
+```
+
+3. Start services:
+
+```bash
+npm run dev:all
+```
+
+Or start individually with `npm run dev`, `npm run dev:phonics`, `npm run dev:comprehension`, `npm run dev:image-generation`, `npm run dev:audiobook`, and `npm run dev:dashboard`.
+
+### Local Ports
 
 | Process | Port |
 | --- | --- |
@@ -94,60 +83,36 @@ The **Next.js app** (orchestrator / BFF) and each **microservice** are separate 
 | audiobook-service | 3004 |
 | dashboard-service | 3005 |
 
-**Typical startup (one terminal per service)**
+## Main Routes
+
+- `/` (story input + generate)
+- `/dashboard`
+- `/features/[storyId]` (feature hub)
+- `/phonics`, `/comprehension`, `/visualization`, `/audiobook` (feature entry pages)
+- `/audiobook/player`
+- `/story/[id]`
+- `/auth`
+
+## Validation Commands
 
 ```bash
-npm install
-# optional: npm install in each microservices/*/ that has its own package.json
-
-npm run dev                              # main app → http://127.0.0.1:3000
-npm run dev:phonics                      # http://127.0.0.1:3001
-npm run dev:comprehension                # http://127.0.0.1:3002
-npm run dev:image-generation             # http://127.0.0.1:3003
-npm run dev:audiobook                    # http://127.0.0.1:3004
-npm run dev:dashboard                    # http://127.0.0.1:3005
+npm run lint
+npm run test
+npm run verify:services
+npm run verify:endpoints
 ```
 
-**Optional:** `npm run dev:all` runs the main app plus all of the above via `concurrently` (local only).
+## Deployment (Google Cloud Run)
 
-**Health checks:** each microservice exposes `GET /health` (and usually `/live`, `/ready`, `/meta` where applicable). With nothing bound on 3001–3005, run `npm run verify:services` to spawn each service briefly and `curl` its `/health`.
+Deployment is script-driven from `ops/gcp/` (no built-in auto-deploy workflow in this repo).
 
-**Deeper checks:** `npm run verify:endpoints` exercises `/health`, `/live`, `/ready`, `/meta`, and one representative feature route per microservice (ports 3001–3005). **Comprehension local DB:** set `DATABASE_URL` in `microservices/comprehension-service/.env`; it takes precedence over `READON_DATABASE_NAME` + Cloud SQL socket (see that service’s `.env.example`).
+- Provision: `bash ops/gcp/provision.sh`
+- Deploy stack: `READON_DEPLOY_ENV=prod|test SERVICE_VERSION=<git-sha> bash ops/gcp/deploy-stack.sh`
+- Verify: `READON_DEPLOY_ENV=prod|test bash ops/gcp/verify/verify-health.sh`
 
-**Cloud Run:** containers listen on `PORT` (typically **8080** from the platform). URLs between services are set at deploy time, not via localhost.
+## Documentation
 
-## Frontend Behavior
-
-Available routes:
-
-- `/`
-- `/auth`
-- `/dashboard`
-- `/phonics`
-- `/comprehension`
-- `/visualization`
-- `/audiobook`
-
-Notes:
-
-- `/interactive` has been removed.
-- The homepage preserves the overall product feel while updating the product-facing copy.
-- The dashboard requires a mock session token stored in local storage.
-- Feature page action buttons intentionally surface placeholder behavior through orchestrators instead of direct service calls.
-
-## Backend Scaffold Expectations
-
-Each microservice directory is intentionally implementation-pending. Route handlers call controller placeholders, controller functions delegate conceptually to future business logic, and critical backend-oriented functions use explicit `NotImplemented` behavior.
-
-This keeps the codebase ready for teammates to add real APIs, storage, data models, and service coordination without inheriting previous implementation constraints.
-
-## Google Cloud Deployment (Skeleton Infra)
-
-This repository includes infrastructure wiring (containerization, Cloud Run deployment scaffolding, health endpoints, and operational config plumbing) while keeping all feature/business logic intentionally stubbed.
-
-- **Ops scripts:** `ops/gcp/README.md` — provision, prod/test deploy, verify.
-- **Dual environment:** same project; `dev` branch → test Cloud Run services, `main` → prod ([docs/environment-separation.md](docs/environment-separation.md)).
-- **Deploy:** Manual `ops/gcp/` scripts; optional GitHub + WIF if you add your own workflow ([docs/cicd-overview.md](docs/cicd-overview.md)).
-- **Config template:** `.env.example`
-
-Planned or partial future pieces (not fully productized here) include Redis/Memorystore and richer service auth beyond the skeleton.
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- Deployment guide: [docs/deployment-guide.md](docs/deployment-guide.md)
+- CI/CD overview: [docs/cicd-overview.md](docs/cicd-overview.md)
+- Env reference: [docs/environment-variables.md](docs/environment-variables.md)
