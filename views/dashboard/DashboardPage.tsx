@@ -10,7 +10,6 @@ import {
   GridItem,
   Heading,
   HStack,
-  Link as ChakraLink,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -23,7 +22,6 @@ import {
   NumberInput,
   NumberInputField,
   NumberInputStepper,
-  SimpleGrid,
   Spinner,
   Stat,
   StatLabel,
@@ -36,26 +34,50 @@ import {
 
 import { AppShell } from '@views/components/AppShell';
 import { useSession } from '@views/providers/SessionProvider';
-import type { FeatureKey } from '@shared/types/features';
-import type { AggregatedHistory, FeatureHistorySlice } from '@orchestrators/dashboard/composition/types';
 
-const FEATURE_CARDS: ReadonlyArray<{ key: FeatureKey; title: string }> = [
-  { key: 'phonics',       title: 'Phonics History'        },
-  { key: 'comprehension', title: 'Comprehension History'  },
-  { key: 'visualization', title: 'Visualization History'  },
-  { key: 'audiobook',     title: 'Audiobook History'      },
-];
+interface MyStoryRow {
+  story_id: string;
+  title: string;
+  source_text: string;
+  phonics_status: string;
+  comprehension_status: string;
+  visualization_status: string;
+  audiobook_status: string;
+  created_at: string;
+}
 
 const CARD_MIN_HEIGHT = '260px';
+const STORIES_PAGE_SIZE = 3;
+
+function relativeTimeFromNow(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return '';
+  const deltaSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (deltaSec < 60) return `${deltaSec}s ago`;
+  const deltaMin = Math.floor(deltaSec / 60);
+  if (deltaMin < 60) return `${deltaMin}m ago`;
+  const deltaHr = Math.floor(deltaMin / 60);
+  if (deltaHr < 24) return `${deltaHr}h ago`;
+  const deltaDay = Math.floor(deltaHr / 24);
+  return `${deltaDay}d ago`;
+}
+
+function storyPreview(text: string, maxChars = 180): string {
+  const compact = (text || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return 'No preview available.';
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, maxChars).trimEnd()}...`;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const toast = useToast();
   const { isReady, session } = useSession();
 
-  const [history, setHistory] = useState<AggregatedHistory | null>(null);
-  const [loadingHistory, setLoadingHistory] = useState(true);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [myStories, setMyStories] = useState<MyStoryRow[]>([]);
+  const [visibleStoryCount, setVisibleStoryCount] = useState(STORIES_PAGE_SIZE);
+  const [loadingStories, setLoadingStories] = useState(true);
+  const [storiesError, setStoriesError] = useState<string | null>(null);
 
   const [balance, setBalance] = useState<number | null>(null);
   const [balanceError, setBalanceError] = useState<string | null>(null);
@@ -71,22 +93,26 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isReady || !session) return;
     let cancelled = false;
-    setLoadingHistory(true);
-    setHistoryError(null);
+    setLoadingStories(true);
+    setStoriesError(null);
     (async () => {
       try {
-        const res = await fetch('/api/dashboard/history?limit=5', { cache: 'no-store', credentials: 'include' });
+        const res = await fetch('/api/dashboard/my-stories?limit=50', { cache: 'no-store', credentials: 'include' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const agg = (await res.json()) as AggregatedHistory;
-        if (!cancelled) setHistory(agg);
+        const body = (await res.json()) as { stories?: MyStoryRow[] };
+        if (!cancelled) setMyStories(body.stories ?? []);
       } catch (err) {
-        if (!cancelled) setHistoryError((err as Error).message);
+        if (!cancelled) setStoriesError((err as Error).message);
       } finally {
-        if (!cancelled) setLoadingHistory(false);
+        if (!cancelled) setLoadingStories(false);
       }
     })();
     return () => { cancelled = true; };
   }, [isReady, session]);
+
+  useEffect(() => {
+    setVisibleStoryCount(STORIES_PAGE_SIZE);
+  }, [myStories.length]);
 
   useEffect(() => {
     if (!isReady || !session) return;
@@ -198,18 +224,71 @@ export default function DashboardPage() {
           </GridItem>
         </Grid>
 
-        <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={6}>
-          {FEATURE_CARDS.map((card) => (
-            <HistoryCard
-              key={card.key}
-              title={card.title}
-              feature={card.key}
-              loading={loadingHistory}
-              slice={history?.[card.key]}
-              globalError={historyError}
-            />
-          ))}
-        </SimpleGrid>
+        <Box
+          bg="white"
+          borderRadius="xl"
+          borderWidth="1px"
+          borderColor="gray.200"
+          p={6}
+          shadow="sm"
+          minH={CARD_MIN_HEIGHT}
+        >
+          <Heading as="h2" size="md" color="blue.600" mb={3}>
+            Your recent stories
+          </Heading>
+          {loadingStories && (
+            <HStack color="gray.500"><Spinner size="sm" /><Text fontSize="sm">Loading...</Text></HStack>
+          )}
+          {!loadingStories && storiesError && (
+            <Text fontSize="sm" color="red.500">Failed to load stories: {storiesError}</Text>
+          )}
+          {!loadingStories && !storiesError && myStories.length === 0 && (
+            <VStack align="stretch" spacing={4} maxW="560px">
+              <Text fontSize="sm" color="gray.500">You don&apos;t have any stories in your history.</Text>
+              <Button colorScheme="blue" variant="outline" alignSelf="flex-start" onClick={() => router.push('/')}>
+                Create a Story
+              </Button>
+            </VStack>
+          )}
+          {!loadingStories && !storiesError && myStories.length > 0 && (
+            <VStack align="stretch" spacing={3}>
+              {Array.from({ length: visibleStoryCount }, (_, idx) => myStories[idx] ?? null).map((story, idx, arr) => (
+                <Box key={story?.story_id ?? `empty-slot-${idx}`} px={1}>
+                  {story ? (
+                    <Box as={NextLink} href={`/features/${encodeURIComponent(story.story_id)}`} display="block" _hover={{ textDecoration: 'none' }}>
+                      <HStack justify="space-between" align="baseline" spacing={3}>
+                        <Text fontSize="md" color="black" fontWeight="bold" noOfLines={1}>
+                          {story.title}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500" whiteSpace="nowrap" flexShrink={0}>
+                          {relativeTimeFromNow(story.created_at)}
+                        </Text>
+                      </HStack>
+                      <Text fontSize="sm" color="gray.700" mt={1} noOfLines={2}>
+                        {storyPreview(story.source_text)}
+                      </Text>
+                    </Box>
+                  ) : (
+                    <Box py={2} minH="68px" />
+                  )}
+                  {idx < arr.length - 1 ? (
+                    <Box mt={3} mx={1} borderBottomWidth="1px" borderColor="gray.200" />
+                  ) : null}
+                </Box>
+              ))}
+              {visibleStoryCount < myStories.length ? (
+                <Button
+                  variant="outline"
+                  colorScheme="blue"
+                  alignSelf="flex-start"
+                  onClick={() => setVisibleStoryCount((count) => Math.min(count + STORIES_PAGE_SIZE, myStories.length))}
+                >
+                  View More Previous Stories
+                </Button>
+              ) : null}
+            </VStack>
+          )}
+        </Box>
       </VStack>
 
       <Modal isOpen={rechargeDialog.isOpen} onClose={rechargeDialog.onClose} isCentered>
@@ -252,57 +331,3 @@ export default function DashboardPage() {
   );
 }
 
-interface HistoryCardProps {
-  title: string;
-  feature: FeatureKey;
-  loading: boolean;
-  slice: FeatureHistorySlice | undefined;
-  globalError: string | null;
-}
-
-function HistoryCard({ title, feature, loading, slice, globalError }: HistoryCardProps) {
-  return (
-    <Box
-      bg="white"
-      borderRadius="xl"
-      borderWidth="1px"
-      borderColor="gray.200"
-      p={6}
-      shadow="sm"
-      minH={CARD_MIN_HEIGHT}
-      display="flex"
-      flexDirection="column"
-    >
-      <Heading as="h2" size="md" color="blue.600" mb={3}>{title}</Heading>
-      {loading && (
-        <HStack color="gray.500"><Spinner size="sm" /><Text fontSize="sm">Loading...</Text></HStack>
-      )}
-      {!loading && globalError && (
-        <Text fontSize="sm" color="red.500">Failed to load: {globalError}</Text>
-      )}
-      {!loading && !globalError && slice?.error && (
-        <Text fontSize="sm" color="orange.500">Service unavailable</Text>
-      )}
-      {!loading && !globalError && !slice?.error && slice && slice.items.length === 0 && (
-        <Text fontSize="sm" color="gray.500">No entries yet.</Text>
-      )}
-      {!loading && !globalError && !slice?.error && slice && slice.items.length > 0 && (
-        <VStack align="stretch" spacing={2}>
-          {slice.items.map((item) => (
-            <ChakraLink
-              key={item.story_id}
-              as={NextLink}
-              href={`/?storyId=${encodeURIComponent(item.story_id)}&service=${feature}`}
-              color="blue.500"
-              _hover={{ textDecoration: 'underline' }}
-              noOfLines={1}
-              title={item.title}
-            >
-              {item.title}
-            </ChakraLink>
-          ))}
-        </VStack>
-      )}
-    </Box>
-  );
-}
