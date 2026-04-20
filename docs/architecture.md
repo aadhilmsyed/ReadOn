@@ -24,7 +24,7 @@ ReadOn/
 │   └── audiobook-service/      (same MVC shape)
 ├── shared/             # Cross-cutting contracts: types, session, content, helpers
 ├── ops/gcp/            # Infrastructure-as-code (Cloud Run, Cloud SQL, GCS, IAM)
-└── .github/workflows/  # CI/CD pipelines (Workload Identity Federation)
+└── .github/workflows/  # optional automation (e.g. Sigrid); GCP deploy via ops/gcp/
 ```
 
 Key structural guarantees that make the style visible at a glance:

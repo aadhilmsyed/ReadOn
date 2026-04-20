@@ -55,7 +55,9 @@ When `READON_DEPLOY_ENV=test`:
 
 - `READON_REDIS_HOST`, `READON_REDIS_PORT`, `READON_REDIS_URL`
 
-## GitHub Actions (repository Variables, not app env)
+## GitHub Actions (repository Variables, not app env — optional)
+
+If you add a deploy workflow that uses WIF, define:
 
 - `GCP_PROJECT_ID`, `WORKLOAD_IDENTITY_PROVIDER`, `CICD_SERVICE_ACCOUNT_PROD`, `CICD_SERVICE_ACCOUNT_TEST`
 

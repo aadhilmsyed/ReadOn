@@ -2,6 +2,8 @@
 
 This project uses **keyless** authentication: GitHub’s OIDC token is exchanged for short-lived Google credentials via **Workload Identity Federation**. Do not store GCP service account JSON keys in GitHub.
 
+**Note:** This repository does **not** include a built-in “deploy on push” workflow. The steps below still apply if you add your own GitHub Actions job (or another OIDC-based runner) that calls `ops/gcp/deploy-stack.sh`.
+
 ## One-time GCP setup
 
 1. Provision shared infrastructure and **both** runtime environments (buckets, databases, runtime service accounts):
@@ -35,21 +37,21 @@ Configure under **Settings → Secrets and variables → Actions → Variables**
 
 **Secrets:** none are required for GCP authentication if WIF is configured as above. Keep using Secrets only for true secrets you add later.
 
-**Important:** Values must live under **Actions → Variables** for this repository (names are case-sensitive). If they are only in `.env` on your laptop or only documented in `INFRA_CREATED.md`, CI will still fail: `vars.GCP_PROJECT_ID` and friends resolve only from GitHub’s variable store.
+**Important:** Values must live under **Actions → Variables** for this repository (names are case-sensitive). If they are only in `.env` on your laptop or only documented in `INFRA_CREATED.md`, a GitHub deploy job will still fail: workflow inputs must read from GitHub’s variable store.
 
-### CI fails immediately: “missing: GCP_PROJECT_ID” (empty inputs)
+### Deploy job fails immediately: “missing: GCP_PROJECT_ID” (empty inputs)
 
-If the log shows `Inputs` with blank `gcp_project_id`, `workload_identity_provider`, or `service_account`, the repository variables are not defined or the names do not match exactly.
+If the log shows blank `gcp_project_id`, `workload_identity_provider`, or `service_account`, the repository variables are not defined or the names do not match exactly.
 
 1. Open **Settings → Secrets and variables → Actions → Variables** for the repo.
 2. Add all four rows from the table above (`GCP_PROJECT_ID`, `WORKLOAD_IDENTITY_PROVIDER`, `CICD_SERVICE_ACCOUNT_PROD`, `CICD_SERVICE_ACCOUNT_TEST`).
-3. Re-run the failed workflow (or push an empty commit to `dev` / `main`).
+3. Re-run the failed job (or trigger the workflow again).
 
-For **test** deploys (`dev` branch), `CICD_SERVICE_ACCOUNT_TEST` must be set; for **prod** (`main`), `CICD_SERVICE_ACCOUNT_PROD` must be set. Define both so either pipeline can run.
+For **test** deploys (typically from the `dev` branch), `CICD_SERVICE_ACCOUNT_TEST` must be set; for **prod** (`main`), `CICD_SERVICE_ACCOUNT_PROD` must be set. Define both if you run both pipelines.
 
-## Workflow permissions
+## Workflow permissions (GitHub Actions deploy job)
 
-The deploy workflow sets:
+A deploy job should set:
 
 - `permissions: id-token: write` — required for OIDC.
 - `permissions: contents: read` — checkout.
@@ -71,10 +73,12 @@ Each CI/CD account is bound to a **GitHub OIDC subject** so only workflows from 
 
 If `gcloud iam service-accounts add-iam-policy-binding` rejects the `principal://…/subject/…` member (special characters), see Google’s [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) troubleshooting or encode the subject as documented for your `gcloud` version.
 
-## Branch expectations
+## Branch expectations (for OIDC-bound CI accounts)
 
-- **`dev`** — must exist and receive pushes to deploy **test** (`readon-*-test`).
-- **`main`** — deploys **prod**.
+The WIF bindings created by `setup-github-oidc-wif.sh` tie each deployer SA to a branch ref:
+
+- **`dev`** — `readon-cicd-test` is limited to **test** (`readon-*-test`).
+- **`main`** — `readon-cicd-prod` is limited to **prod**.
 
 ## Common failure points
 
@@ -82,16 +86,16 @@ If `gcloud iam service-accounts add-iam-policy-binding` rejects the `principal:/
 |--------|----------------|
 | `Missing GitHub Actions Variables` in CI | Repository **Variables** (not Secrets): `GCP_PROJECT_ID`, `WORKLOAD_IDENTITY_PROVIDER`, `CICD_SERVICE_ACCOUNT_PROD`, `CICD_SERVICE_ACCOUNT_TEST` |
 | `failed to generate Google OAuth access token` / WIF errors | `WORKLOAD_IDENTITY_PROVIDER` must be the full `projects/…/providers/…` string; `GITHUB_REPO_FULL` in the WIF script must match `owner/repo` exactly |
-| Prod workflow can’t deploy | Push must be to **`main`** so the OIDC subject matches `refs/heads/main` for `readon-cicd-prod` |
-| Test workflow can’t deploy | Push must be to **`dev`** for `readon-cicd-test` |
+| Prod job can’t authenticate | The job must run with OIDC subject matching **`refs/heads/main`** for `readon-cicd-prod` |
+| Test job can’t authenticate | The job must run with OIDC subject matching **`refs/heads/dev`** for `readon-cicd-test` |
 | Permission denied deploying Cloud Run | CI SA needs `run.admin`, `cloudbuild.builds.editor`, and `iam.serviceAccountUser` on the **five** runtime SAs for that environment (re-run `setup-github-oidc-wif.sh` after `provision.sh`) |
-| `forbidden from accessing the bucket [<project>_cloudbuild]` on `gcloud builds submit` | Run **`bash ops/gcp/grant-cicd-cloudbuild-access.sh`** once with project owner credentials (creates the default `_cloudbuild` bucket in `US` if missing, grants `storage.objectAdmin` + Service Usage consumer to `readon-cicd-test` / `readon-cicd-prod`). Then re-run the workflow. This is also invoked from `provision.sh` and `wif/setup-github-oidc-wif.sh`. |
+| `forbidden from accessing the bucket [<project>_cloudbuild]` on `gcloud builds submit` | Run **`bash ops/gcp/grant-cicd-cloudbuild-access.sh`** once with project owner credentials (creates the default `_cloudbuild` bucket in `US` if missing, grants `storage.objectAdmin` + Service Usage consumer to `readon-cicd-test` / `readon-cicd-prod`). Then re-run the deploy job. This is also invoked from `provision.sh` and `wif/setup-github-oidc-wif.sh`. |
 
-Reusable workflow uses **concurrency** per environment (`readon-deploy-prod` / `readon-deploy-test`) so overlapping pushes cancel the older in-flight job for that environment.
+If you implement deploy in Actions, consider **concurrency** per environment so overlapping runs to the same stack cancel or queue safely.
 
 ## Environment protection (optional)
 
-The workflows deploy immediately on push. You can later add [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) with required reviewers for `prod`; that is optional and not required for the current skeleton.
+If you deploy from Actions on every push, you can add [GitHub Environments](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) with required reviewers for `prod`.
 
 ## CI/CD deployer IAM (summary)
 

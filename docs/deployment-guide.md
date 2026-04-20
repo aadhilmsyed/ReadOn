@@ -1,6 +1,6 @@
 # ReadOn Deployment Guide (Skeleton)
 
-This guide documents how to deploy the skeleton into Google Cloud, including **prod** and **test** stacks in the same project and optional **GitHub Actions** automation.
+This guide documents how to deploy the skeleton into Google Cloud, including **prod** and **test** stacks in the same project. Deploy from your machine (or your own CI); there is no built-in “deploy on push” workflow in this repo.
 
 ## Environments
 
@@ -41,7 +41,7 @@ READON_DEPLOY_ENV=prod bash ops/gcp/deploy-microservice-audiobook.sh
 
 ## CI/CD
 
-GitHub Actions deploys on push to **`main`** (prod) and **`dev`** (test). See [cicd-overview.md](cicd-overview.md) and [github-actions-setup.md](github-actions-setup.md).
+Use `ops/gcp/deploy-stack.sh` (and related scripts) with the right `READON_DEPLOY_ENV`. Overview: [cicd-overview.md](cicd-overview.md). Optional GitHub + WIF setup if you add your own deploy workflow: [github-actions-setup.md](github-actions-setup.md).
 
 ## Verify operational endpoints
 
@@ -116,9 +116,8 @@ READON_DEPLOY_ENV=test bash ops/gcp/verify/inspect-access-model.sh
 
 | Symptom | Likely cause |
 |--------|----------------|
-| Workflow fails at “Validate workflow inputs” | Missing GitHub Variables: `GCP_PROJECT_ID`, `WORKLOAD_IDENTITY_PROVIDER`, `CICD_SERVICE_ACCOUNT_PROD` / `TEST` |
-| Auth fails after validate | WIF principal mismatch (wrong repo string, or push from a branch other than `main`/`dev` trying to use the wrong SA) |
+| `gcloud` auth / permission errors when deploying | Use credentials with Cloud Run + Cloud Build IAM; see ops scripts and [github-actions-setup.md](github-actions-setup.md) if using WIF from CI |
 | `service not found` in verify | Wrong `READON_DEPLOY_ENV` for the stack you deployed |
 | Microservices return 200 without auth | Policy drift: re-run `deploy-microservice*.sh` for that env to re-apply invoker hardening |
 
-See [github-actions-setup.md](github-actions-setup.md) for WIF details.
+See [github-actions-setup.md](github-actions-setup.md) for WIF and CI deployer service accounts if you deploy from GitHub Actions.

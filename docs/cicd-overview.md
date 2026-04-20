@@ -1,26 +1,29 @@
-# CI/CD overview (GitHub Actions → Google Cloud)
+# CI/CD overview (Google Cloud)
 
-## Branch → environment mapping
+## Branch → environment mapping (when you deploy)
 
 | Git branch | `READON_DEPLOY_ENV` | Cloud Run stack |
 |------------|---------------------|-----------------|
 | `dev`      | `test`              | `readon-*-test` services |
 | `main`     | `prod`              | `readon-*` services (no suffix) |
 
-Pushes to other branches do not run the deploy workflow.
+This mapping is a **convention** for which stack you intend to update. Deployments are driven by the `READON_DEPLOY_ENV` you pass to the scripts, not by GitHub automatically.
 
-## What runs on each push
+## Deployments today
 
-Workflow: [deploy.yml](../.github/workflows/deploy.yml) calls [deploy-reusable.yml](../.github/workflows/deploy-reusable.yml).
+This repository does **not** run an automatic “deploy on push” GitHub Actions workflow. Deploy manually from a machine with `gcloud` (or wire your own CI) using:
 
-1. **Authenticate** with Workload Identity Federation (OIDC). No long-lived JSON keys.
-2. **Install gcloud** and select `vars.GCP_PROJECT_ID`.
-3. **Build and deploy** via `ops/gcp/deploy-stack.sh`:
-   - Cloud Build builds each image (`gcloud builds submit` + `ops/gcp/cloudbuild/build-dockerfile.yaml`).
-   - Microservices deploy first; their URLs are read from Cloud Run and passed into the main app deploy.
-4. **Verify** with `ops/gcp/verify/verify-health.sh` (public main + authenticated-only microservices).
+- `ops/gcp/deploy-stack.sh` — full stack for one environment
+- `ops/gcp/verify/verify-health.sh` — post-deploy checks
 
-`SERVICE_VERSION` is set to the Git commit SHA for traceability.
+Set `SERVICE_VERSION` to your Git SHA for traceability (see [deployment-guide.md](deployment-guide.md)).
+
+Typical flow:
+
+1. **Authenticate** with user credentials or a service account you control (see [deployment-guide.md](deployment-guide.md)).
+2. **Install gcloud** and select the target project.
+3. **Build and deploy** via `ops/gcp/deploy-stack.sh` (Cloud Build + Cloud Run).
+4. **Verify** with `ops/gcp/verify/verify-health.sh`.
 
 ## Scripts involved
 
@@ -28,9 +31,12 @@ Workflow: [deploy.yml](../.github/workflows/deploy.yml) calls [deploy-reusable.y
 - `ops/gcp/deploy-main.sh`, `ops/gcp/deploy-microservice*.sh` — per-service deploys (still usable standalone).
 - `ops/gcp/vars.sh` + `ops/gcp/readon-deploy-env.sh` — resolve names from `READON_DEPLOY_ENV`.
 
-The reusable workflow sets **concurrency** groups `readon-deploy-prod` and `readon-deploy-test` so overlapping pushes to the same environment cancel the older in-flight job (`cancel-in-progress: true`).
+## Optional: GitHub Actions + WIF
+
+If you add your own workflow to deploy from GitHub, use **Workload Identity Federation** (no JSON keys in GitHub). One-time GCP and variable setup: [github-actions-setup.md](github-actions-setup.md).
 
 ## Related docs
 
-- [github-actions-setup.md](github-actions-setup.md) — WIF, GitHub variables, one-time GCP setup.
+- [deployment-guide.md](deployment-guide.md) — provision, deploy, verify, rollback.
+- [github-actions-setup.md](github-actions-setup.md) — WIF, GitHub variables, CI deployer SAs.
 - [environment-separation.md](environment-separation.md) — test vs prod resource names and isolation.

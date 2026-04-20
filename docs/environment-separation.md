@@ -59,10 +59,12 @@ Connection name is the same (`CLOUDSQL_CONNECTION_NAME`); only the database name
 - Prod: `readon-main-sa`, `readon-phonics-sa`, … (no suffix)
 - Test: `readon-main-sa-test`, `readon-phonics-sa-test`, …
 
-**CI/CD (GitHub Actions via WIF):**
+**CI/CD deployer (WIF-bound, for GitHub or other OIDC callers):**
 
 - `readon-cicd-prod` — may impersonate only prod runtime SAs (and deploy prod services).
 - `readon-cicd-test` — may impersonate only test runtime SAs.
+
+These exist for keyless deploy from CI if you configure it; this repo does not run an automatic deploy workflow by default.
 
 ## Artifact Registry
 

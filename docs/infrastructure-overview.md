@@ -46,4 +46,4 @@ Each runtime service account has `roles/storage.objectViewer` on **its** bucket 
 
 ## CI/CD
 
-GitHub Actions uses Workload Identity Federation (no JSON keys). See [cicd-overview.md](cicd-overview.md).
+Deploy with `ops/gcp/` scripts (and optionally your own GitHub Actions + WIF). See [cicd-overview.md](cicd-overview.md).
