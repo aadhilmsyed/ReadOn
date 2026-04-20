@@ -140,6 +140,7 @@ function createReadOnHttpServer({ serviceName, routeHandler }) {
 }
 
 function startReadOnService({ serviceName, routeHandler }) {
+  // Cloud Run sets PORT (typically 8080). Local dev sets per-service PORT in that service’s `.env`.
   const port = Number(process.env.PORT || 8080);
   const host = process.env.HOST || '0.0.0.0';
 

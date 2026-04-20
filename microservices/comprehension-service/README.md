@@ -63,7 +63,7 @@ READON_DATABASE_PASSWORD=REPLACE_ME
 The main app needs this to call the service:
 
 ```bash
-READON_COMPREHENSION_SERVICE_URL=http://127.0.0.1:18080
+READON_COMPREHENSION_SERVICE_URL=http://127.0.0.1:3002
 ```
 
 Circuit breaker and provider settings:
@@ -129,14 +129,14 @@ READON_DATABASE_NAME=comprehension \
 READON_DATABASE_HOST=localhost \
 READON_DATABASE_USER=kuhoos \
 HOST=127.0.0.1 \
-PORT=18080 \
+PORT=3002 \
 node microservices/comprehension-service/server.js
 ```
 
 In another terminal, start the main app:
 
 ```bash
-READON_COMPREHENSION_SERVICE_URL=http://127.0.0.1:18080 \
+READON_COMPREHENSION_SERVICE_URL=http://127.0.0.1:3002 \
 npm run dev
 ```
 
@@ -185,7 +185,7 @@ READON_DATABASE_NAME=comprehension \
 READON_DATABASE_HOST=localhost \
 READON_DATABASE_USER=kuhoos \
 HOST=127.0.0.1 \
-PORT=18080 \
+PORT=3002 \
 node microservices/comprehension-service/server.js
 ```
 

@@ -1,26 +1,17 @@
-FROM node:22-alpine AS deps
+# Build from repository root (see ops/gcp/build-image.sh).
+FROM node:22-alpine AS builder
 WORKDIR /app
-
-COPY package.json package-lock.json ./
+COPY microservices/image-generation-service/package.json microservices/image-generation-service/package-lock.json ./
 RUN npm ci
-
-FROM node:22-alpine AS build
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY microservices/image-generation-service/ ./
 RUN npm run build
 
-FROM node:22-alpine AS runtime
+FROM node:22-alpine
 WORKDIR /app
-
 ENV NODE_ENV=production
-ENV PORT=3001
-
-COPY package.json package-lock.json ./
+COPY microservices/image-generation-service/package.json microservices/image-generation-service/package-lock.json ./
 RUN npm ci --omit=dev
-
-COPY --from=build /app/dist ./dist
-
-EXPOSE 3001
-CMD ["npm", "start"]
+COPY --from=builder /app/dist ./dist
+EXPOSE 8080
+ENV PORT=8080
+CMD ["node", "dist/server.js"]

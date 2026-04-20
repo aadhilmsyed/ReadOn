@@ -26,7 +26,7 @@ while the dashboard still has a clean place to own its own data lifecycle.
 cp microservices/dashboard-service/.env.example microservices/dashboard-service/.env
 # fill PGPASSWORD
 node microservices/dashboard-service/server.js
-# listening on http://localhost:4100
+# listening on http://127.0.0.1:3005 (local dev; Cloud Run uses PORT from deploy)
 ```
 
 ## Architectural role
