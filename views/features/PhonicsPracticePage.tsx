@@ -1,7 +1,7 @@
 'use client';
 
 import { keyframes } from '@emotion/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { FaVolumeHigh } from 'react-icons/fa6';
@@ -52,6 +52,8 @@ function formatPartOfSpeech(wt: WordTypeTag): string | null {
 
 export function PhonicsPracticePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const storyIdParam = (searchParams.get('storyId') ?? '').trim();
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [cards, setCards] = useState<Flash[]>([]);
@@ -68,19 +70,58 @@ export function PhonicsPracticePage() {
   }, [index]);
 
   useLayoutEffect(() => {
-    const storyText = sessionStorage.getItem(PHONICS_SESSION_STORY_TEXT_KEY)?.trim();
-    if (!storyText) {
-      sessionStorage.setItem(
-        PHONICS_SESSION_HOME_FLASH_ERROR_KEY,
-        'No input text could be found.',
-      );
-      router.replace('/');
-      return;
-    }
-
     let cancelled = false;
 
-    async function run() {
+    async function runFromStoryId(storyId: string) {
+      setPhase('loading');
+      setErrorMessage(null);
+      try {
+        const res = await fetch(`/api/phonics/story/${encodeURIComponent(storyId)}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        const json = (await res.json()) as {
+          success?: boolean;
+          data?: Flash[];
+          detail?: string;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (res.status === 404) {
+          setErrorMessage('We could not find that story for your account.');
+          setPhase('error');
+          setCards([]);
+          return;
+        }
+        if (!res.ok || json.success === false) {
+          setErrorMessage(json.detail || json.error || `Request failed (${res.status})`);
+          setPhase('error');
+          setCards([]);
+          return;
+        }
+        const list = json.data ?? [];
+        setCards(list);
+        setIndex(0);
+        setPhase('ready');
+      } catch (e) {
+        if (cancelled) return;
+        setErrorMessage(e instanceof Error ? e.message : String(e));
+        setPhase('error');
+        setCards([]);
+      }
+    }
+
+    async function runFromSessionText() {
+      const storyText = sessionStorage.getItem(PHONICS_SESSION_STORY_TEXT_KEY)?.trim();
+      if (!storyText) {
+        sessionStorage.setItem(
+          PHONICS_SESSION_HOME_FLASH_ERROR_KEY,
+          'No input text could be found.',
+        );
+        router.replace('/');
+        return;
+      }
+
       setPhase('loading');
       setErrorMessage(null);
       try {
@@ -115,11 +156,16 @@ export function PhonicsPracticePage() {
       }
     }
 
-    void run();
+    if (storyIdParam) {
+      void runFromStoryId(storyIdParam);
+    } else {
+      void runFromSessionText();
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, storyIdParam]);
 
   const playAudio = useCallback(() => {
     if (!current?.audioUrl) return;
@@ -186,11 +232,11 @@ export function PhonicsPracticePage() {
         <Button
           colorScheme="blue"
           size="lg"
-          onClick={() => router.push('/')}
+          onClick={() => router.push(storyIdParam ? `/features/${encodeURIComponent(storyIdParam)}` : '/')}
           bgGradient="linear(to-r, blue.400, purple.500)"
           _hover={{ bgGradient: 'linear(to-r, blue.500, purple.600)' }}
         >
-          Back to home
+          {storyIdParam ? 'Back to story' : 'Back to home'}
         </Button>
       </VStack>
     );
@@ -198,6 +244,13 @@ export function PhonicsPracticePage() {
 
   return (
     <VStack spacing={10} align="stretch" maxW="900px" mx="auto">
+      {storyIdParam ? (
+        <HStack>
+          <Button variant="ghost" size="sm" onClick={() => router.push(`/features/${encodeURIComponent(storyIdParam)}`)}>
+            ← Back to story features
+          </Button>
+        </HStack>
+      ) : null}
       <VStack spacing={3} align="center" textAlign="center" pt={2}>
         <Heading
           as="h1"
