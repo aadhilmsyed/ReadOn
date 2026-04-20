@@ -1,15 +1,16 @@
 'use client';
 
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Alert,
   AlertDescription,
   AlertIcon,
   Box,
   Button,
+  Flex,
   Grid,
-  Heading,
   HStack,
   IconButton,
   Image,
@@ -21,6 +22,7 @@ import {
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import HTMLFlipBook from 'react-pageflip';
 
+import { extractStoryParagraphFromIllustrationPrompt } from '@/lib/visualization/extractStoryParagraphFromPrompt';
 import { AppShell } from '@views/components/AppShell';
 import { useText } from '@views/providers/TextProvider';
 import { generateImage, type GeneratedImageClientResult } from '@shared/clients/imageGenerationClient';
@@ -40,7 +42,19 @@ interface ParagraphScene {
 const STORYBOOK_CACHE_KEY = 'readon.visualization.storybook';
 const MAX_PROMPT_PARAGRAPH_CHARS = 900;
 const MAX_CONTEXT_CHARS = 700;
-const NAV_AND_SHELL_OFFSET = 96;
+/** Page height ÷ width — keep in sync with prior storybook layout. */
+const PAGE_HEIGHT_OVER_WIDTH = 0.72;
+
+/** Full width of the content track (same as Storybook bar); height follows fixed ratio. */
+function computeBookDimensions(trackWidthPx: number): { pageWidth: number; pageHeight: number } {
+  const w = Math.floor(trackWidthPx);
+  if (w < 120) {
+    return { pageWidth: 640, pageHeight: Math.round(640 * PAGE_HEIGHT_OVER_WIDTH) };
+  }
+  const pageWidth = Math.max(300, w);
+  const pageHeight = Math.round(pageWidth * PAGE_HEIGHT_OVER_WIDTH);
+  return { pageWidth, pageHeight };
+}
 
 interface FlipBookRef {
   pageFlip: () => {
@@ -112,24 +126,6 @@ function cacheStorybook(story: string, scenes: ParagraphScene[]): void {
   window.sessionStorage.setItem(STORYBOOK_CACHE_KEY, JSON.stringify({ story, scenes }));
 }
 
-function getBookSize() {
-  if (typeof window === 'undefined') {
-    return { pageWidth: 520, pageHeight: 660 };
-  }
-
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const availableHeight = Math.max(520, viewportHeight - NAV_AND_SHELL_OFFSET - 28);
-  const availableWidth = Math.max(320, viewportWidth - 130);
-  const pageWidth = Math.min(1180, availableWidth);
-  const pageHeight = Math.min(720, Math.max(500, Math.floor(pageWidth * 0.58), availableHeight - 18));
-
-  return {
-    pageWidth: Math.max(340, pageWidth),
-    pageHeight: Math.min(pageHeight, availableHeight),
-  };
-}
-
 async function generateSceneImage(prompt: string): Promise<GeneratedImageClientResult> {
   return generateImage({
     prompt,
@@ -138,6 +134,27 @@ async function generateSceneImage(prompt: string): Promise<GeneratedImageClientR
     ageGroup: 'children',
     numImages: 1,
   });
+}
+
+interface PreparedSceneApi {
+  prompt?: string;
+  imageUrls?: string[];
+  generationId?: string;
+}
+
+function mapPreparedScene(s: PreparedSceneApi): ParagraphScene {
+  const p = s.prompt || '';
+  const paragraph = extractStoryParagraphFromIllustrationPrompt(p);
+  const url = Array.isArray(s.imageUrls) && s.imageUrls[0] ? s.imageUrls[0] : undefined;
+  return {
+    paragraph,
+    prompt: p,
+    imageUrl: url,
+    requestId: s.generationId,
+    cached: true,
+    status: url ? 'complete' : 'failed',
+    error: url ? undefined : 'No image for this scene.',
+  };
 }
 
 const StorybookPage = forwardRef<HTMLDivElement, { scene: ParagraphScene; index: number; total: number }>(
@@ -173,7 +190,7 @@ const StorybookPage = forwardRef<HTMLDivElement, { scene: ParagraphScene; index:
           >
             <Text
               fontFamily="Georgia, serif"
-              fontSize={{ base: 'md', md: '2xl' }}
+              fontSize={{ base: 'sm', md: 'xl' }}
               lineHeight="1.75"
               color="gray.800"
             >
@@ -226,7 +243,7 @@ const StorybookPage = forwardRef<HTMLDivElement, { scene: ParagraphScene; index:
         </Grid>
 
         <HStack
-          justify="space-between"
+          justify="center"
           px={{ base: 4, md: 6 }}
           py={3}
           borderTop="1px solid"
@@ -235,11 +252,6 @@ const StorybookPage = forwardRef<HTMLDivElement, { scene: ParagraphScene; index:
           fontSize="xs"
         >
           <Text>Page {index + 1} of {total}</Text>
-          {scene.requestId && (
-            <Text noOfLines={1}>
-              {scene.cached ? 'Cached' : 'Generated'} - {scene.requestId}
-            </Text>
-          )}
         </HStack>
       </VStack>
     </Box>
@@ -248,21 +260,25 @@ const StorybookPage = forwardRef<HTMLDivElement, { scene: ParagraphScene; index:
 
 StorybookPage.displayName = 'StorybookPage';
 
-export default function VisualizationPage() {
+function VisualizationPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const storyIdParam = (searchParams.get('storyId') ?? '').trim();
   const { inputText } = useText();
   const story = inputText.trim();
   const [scenes, setScenes] = useState<ParagraphScene[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [started, setStarted] = useState(false);
-  const [bookSize, setBookSize] = useState(() => getBookSize());
+  const [bookSize, setBookSize] = useState(() => ({
+    pageWidth: 920,
+    pageHeight: Math.round(920 * PAGE_HEIGHT_OVER_WIDTH),
+  }));
   const [visibleSceneIndex, setVisibleSceneIndex] = useState(0);
+  const [packError, setPackError] = useState<string | null>(null);
   const flipBookRef = useRef<FlipBookRef>(null);
+  const bookTrackRef = useRef<HTMLDivElement>(null);
 
   const paragraphs = useMemo(() => splitStoryIntoParagraphs(story), [story]);
-  const completedCount = scenes.filter((scene) => scene.status === 'complete').length;
-  const failedCount = scenes.filter((scene) => scene.status === 'failed').length;
-  const progressValue = scenes.length > 0 ? ((completedCount + failedCount) / scenes.length) * 100 : 0;
-  const isGenerating = scenes.some((scene) => scene.status === 'loading');
   const canGoPrevious = visibleSceneIndex > 0;
   const canGoNext = visibleSceneIndex < Math.max(0, scenes.length - 1);
 
@@ -301,21 +317,71 @@ export default function VisualizationPage() {
   }
 
   useEffect(() => {
-    function updateBookSize() {
-      setBookSize(getBookSize());
+    if (scenes.length === 0) return undefined;
+
+    const el = bookTrackRef.current;
+    if (!el) return undefined;
+
+    function measure() {
+      const w = el.getBoundingClientRect().width;
+      if (w >= 32) {
+        setBookSize(computeBookDimensions(w));
+      }
     }
 
-    updateBookSize();
-    window.addEventListener('resize', updateBookSize);
+    measure();
+    const rafId = requestAnimationFrame(measure);
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    window.addEventListener('resize', measure);
 
     return () => {
-      window.removeEventListener('resize', updateBookSize);
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
     };
-  }, []);
+  }, [scenes.length]);
 
   useEffect(() => {
+    if (!storyIdParam) return undefined;
+    let cancelled = false;
+    setPackError(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/visualization/story/${encodeURIComponent(storyIdParam)}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setPackError('This storybook is not available for your account.');
+          setScenes([]);
+          setStarted(false);
+          return;
+        }
+        const data = (await res.json()) as { success?: boolean; scenes?: PreparedSceneApi[] };
+        if (cancelled) return;
+        const raw = Array.isArray(data.scenes) ? data.scenes : [];
+        const mapped = raw.map((s) => mapPreparedScene(s));
+        if (mapped.length === 0) {
+          setPackError('No illustration scenes were found for this story.');
+        }
+        setScenes(mapped);
+        setStarted(true);
+        setVisibleSceneIndex(0);
+      } catch {
+        if (!cancelled) setPackError('Could not load the storybook.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storyIdParam]);
+
+  useEffect(() => {
+    if (storyIdParam) return undefined;
     if (!story || paragraphs.length === 0) {
-      return;
+      return undefined;
     }
 
     const initialScenes: ParagraphScene[] = paragraphs.map((paragraph, index) => ({
@@ -402,19 +468,37 @@ export default function VisualizationPage() {
     return () => {
       cancelled = true;
     };
-  }, [paragraphs, story]);
+  }, [paragraphs, story, storyIdParam]);
 
   return (
     <AppShell>
-      <Box
-        position="relative"
-        w="100vw"
-        minH={`calc(100vh - ${NAV_AND_SHELL_OFFSET}px)`}
-        ml="calc(50% - 50vw)"
-        mt={-10}
-      >
-        {!story && (
-          <Alert status="info" borderRadius="lg" maxW="720px" mx="auto">
+      <VStack spacing={5} align="stretch" maxW="1100px" mx="auto" px={{ base: 3, md: 6 }} pb={10} pt={2}>
+        <HStack justify="space-between" w="100%" flexWrap="wrap" gap={2}>
+          <Box>
+            {storyIdParam ? (
+              <Button variant="ghost" size="sm" onClick={() => router.push(`/features/${encodeURIComponent(storyIdParam)}`)}>
+                ← Back to story features
+              </Button>
+            ) : null}
+          </Box>
+          <Box>
+            {!storyIdParam && story ? (
+              <Button as={Link} href="/" variant="ghost" size="sm">
+                Edit story
+              </Button>
+            ) : null}
+          </Box>
+        </HStack>
+
+        {packError ? (
+          <Alert status="warning" borderRadius="lg">
+            <AlertIcon />
+            <AlertDescription>{packError}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {!story && !storyIdParam && (
+          <Alert status="info" borderRadius="lg">
             <AlertIcon />
             <AlertDescription>
               Enter a story on the home page, then choose Visualization to create your illustrated storybook.
@@ -422,140 +506,163 @@ export default function VisualizationPage() {
           </Alert>
         )}
 
-        {story && started && (
-          <Box
-            position="fixed"
-            top={{ base: '74px', md: '14px' }}
-            left={{ base: 3, md: '50%' }}
-            transform={{ base: 'none', md: 'translateX(-50%)' }}
-            zIndex={20}
-            w={{ base: 'calc(100% - 24px)', md: '390px' }}
-            bg="whiteAlpha.200"
-            border="1px solid"
-            borderColor="whiteAlpha.300"
-            borderRadius="md"
-            px={3}
-            py={1.5}
-            boxShadow="sm"
-            backdropFilter="blur(10px)"
-          >
-            <HStack align="center" spacing={3} h="34px">
-              <Box minW={0} flex="1">
-                <Text fontSize="xs" fontWeight="bold" color="white" noOfLines={1}>
-                  Storybook
-                </Text>
-                <Progress value={progressValue} colorScheme="yellow" borderRadius="full" size="xs" mt={1} />
-              </Box>
-              <HStack spacing={2} flexShrink={0}>
-                {isGenerating && activeIndex !== null && <Spinner size="xs" color="whiteAlpha.900" />}
-                <Text fontSize="xs" color="whiteAlpha.900" whiteSpace="nowrap">
-                  {completedCount}/{scenes.length} ready
-                </Text>
-                {failedCount > 0 && (
-                  <Text fontSize="xs" color="red.100" whiteSpace="nowrap">
-                    {failedCount} failed
-                  </Text>
-                )}
-                <Button as={Link} href="/" variant="solid" colorScheme="yellow" size="xs" borderRadius="md">
-                  Edit
-                </Button>
-              </HStack>
-            </HStack>
-          </Box>
-        )}
+        {storyIdParam && !started && !packError ? (
+          <VStack py={16} spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text color="gray.600">Loading storybook…</Text>
+          </VStack>
+        ) : null}
 
         {scenes.length > 0 && (
-          <Box
-            position="relative"
-            minH={`calc(100vh - ${NAV_AND_SHELL_OFFSET}px)`}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            bg="#d8e3e7"
-            borderRadius="none"
-            p={{ base: 2, md: 3 }}
-            boxShadow="2xl"
-            overflow="hidden"
+          <Flex
+            w="100%"
+            align="center"
+            justify="center"
+            gap={{ base: 2, sm: 3, md: 4 }}
+            px={{ base: 0, sm: 1 }}
+            flexDir={{ base: 'column', md: 'row' }}
+            py={2}
           >
             <IconButton
+              display={{ base: 'none', md: 'inline-flex' }}
               aria-label="Previous page"
               icon={<FaChevronLeft />}
               onClick={flipPreviousPage}
               isDisabled={!canGoPrevious}
-              colorScheme="yellow"
-              variant="solid"
-              borderRadius="md"
-              position="absolute"
-              left={{ base: 2, md: 6 }}
-              top="50%"
-              transform="translateY(-50%)"
-              zIndex={4}
-              boxShadow="lg"
+              isRound
+              flexShrink={0}
+              size="lg"
+              bgGradient="linear(to-br, blue.500, purple.600)"
+              color="white"
+              boxShadow="md"
+              _hover={{
+                bgGradient: 'linear(to-br, blue.600, purple.700)',
+                boxShadow: 'lg',
+                transform: 'translateY(-1px)',
+              }}
+              _active={{ transform: 'translateY(0)' }}
+              transition="all 0.2s ease"
             />
 
-            <Box
-              overflow="hidden"
-              borderRadius="md"
-              bg="#6b7d84"
-              p={{ base: 1, md: 3 }}
-              maxW="calc(100vw - 112px)"
-              maxH={`calc(100vh - ${NAV_AND_SHELL_OFFSET + 24}px)`}
-            >
-              <HTMLFlipBook
-                ref={flipBookRef}
-                className="readon-storybook"
-                style={{ margin: '0 auto' }}
-                width={bookSize.pageWidth}
-                height={bookSize.pageHeight}
-                minWidth={bookSize.pageWidth}
-                maxWidth={bookSize.pageWidth}
-                minHeight={bookSize.pageHeight}
-                maxHeight={bookSize.pageHeight}
-                size="fixed"
-                startPage={0}
-                drawShadow
-                flippingTime={700}
-                usePortrait
-                startZIndex={0}
-                autoSize
-                maxShadowOpacity={0.35}
-                showCover={false}
-                mobileScrollSupport
-                clickEventForward
-                useMouseEvents
-                swipeDistance={20}
-                showPageCorners
-                disableFlipByClick
+            <Box ref={bookTrackRef} flex="1" minW={0} w="100%" maxW="100%">
+              <Box
+                overflow="hidden"
+                borderRadius="md"
+                boxShadow="md"
+                borderWidth="1px"
+                borderColor="gray.200"
+                bg="white"
+                mx="auto"
+                w="100%"
+                maxW="100%"
+                display="flex"
+                justifyContent="center"
               >
-                {scenes.map((scene, index) => (
-                  <StorybookPage
-                    key={`${index}-${scene.paragraph.slice(0, 20)}`}
-                    scene={scene}
-                    index={index}
-                    total={scenes.length}
-                  />
-                ))}
-              </HTMLFlipBook>
+                <HTMLFlipBook
+                  ref={flipBookRef}
+                  className="readon-storybook"
+                  style={{ margin: '0 auto' }}
+                  width={bookSize.pageWidth}
+                  height={bookSize.pageHeight}
+                  minWidth={bookSize.pageWidth}
+                  maxWidth={bookSize.pageWidth}
+                  minHeight={bookSize.pageHeight}
+                  maxHeight={bookSize.pageHeight}
+                  size="fixed"
+                  startPage={0}
+                  drawShadow
+                  flippingTime={700}
+                  usePortrait
+                  startZIndex={0}
+                  autoSize
+                  maxShadowOpacity={0.35}
+                  showCover={false}
+                  mobileScrollSupport
+                  clickEventForward
+                  useMouseEvents
+                  swipeDistance={20}
+                  showPageCorners
+                  disableFlipByClick
+                >
+                  {scenes.map((scene, index) => (
+                    <StorybookPage
+                      key={`${index}-${scene.paragraph.slice(0, 20)}`}
+                      scene={scene}
+                      index={index}
+                      total={scenes.length}
+                    />
+                  ))}
+                </HTMLFlipBook>
+              </Box>
             </Box>
 
             <IconButton
+              display={{ base: 'none', md: 'inline-flex' }}
               aria-label="Next page"
               icon={<FaChevronRight />}
               onClick={flipNextPage}
               isDisabled={!canGoNext}
-              colorScheme="yellow"
-              variant="solid"
-              borderRadius="md"
-              position="absolute"
-              right={{ base: 2, md: 6 }}
-              top="50%"
-              transform="translateY(-50%)"
-              zIndex={4}
-              boxShadow="lg"
+              isRound
+              flexShrink={0}
+              size="lg"
+              bgGradient="linear(to-br, blue.500, purple.600)"
+              color="white"
+              boxShadow="md"
+              _hover={{
+                bgGradient: 'linear(to-br, blue.600, purple.700)',
+                boxShadow: 'lg',
+                transform: 'translateY(-1px)',
+              }}
+              _active={{ transform: 'translateY(0)' }}
+              transition="all 0.2s ease"
             />
-          </Box>
+
+            <HStack display={{ base: 'flex', md: 'none' }} justify="center" spacing={6} pt={1} w="100%">
+              <IconButton
+                aria-label="Previous page"
+                icon={<FaChevronLeft />}
+                onClick={flipPreviousPage}
+                isDisabled={!canGoPrevious}
+                isRound
+                size="md"
+                bgGradient="linear(to-br, blue.500, purple.600)"
+                color="white"
+                boxShadow="md"
+                _hover={{ bgGradient: 'linear(to-br, blue.600, purple.700)' }}
+              />
+              <IconButton
+                aria-label="Next page"
+                icon={<FaChevronRight />}
+                onClick={flipNextPage}
+                isDisabled={!canGoNext}
+                isRound
+                size="md"
+                bgGradient="linear(to-br, blue.500, purple.600)"
+                color="white"
+                boxShadow="md"
+                _hover={{ bgGradient: 'linear(to-br, blue.600, purple.700)' }}
+              />
+            </HStack>
+          </Flex>
         )}
-      </Box>
+      </VStack>
     </AppShell>
+  );
+}
+
+export default function VisualizationPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell>
+          <VStack py={20} spacing={4}>
+            <Spinner size="xl" color="blue.500" />
+            <Text color="gray.600">Loading visualization…</Text>
+          </VStack>
+        </AppShell>
+      }
+    >
+      <VisualizationPageInner />
+    </Suspense>
   );
 }
