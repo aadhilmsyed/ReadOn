@@ -42,14 +42,72 @@ function badJson(sendJson, res) {
   });
 }
 
-function serverError(sendJson, res) {
+/** Maps DB / repository errors to developer-actionable JSON (avoids vague generic message when we know the cause). */
+function sendPersistenceAwareError(sendJson, res, err) {
+  const requestId = `req_${Date.now().toString(36)}`;
+  const code = err && err.code;
+  const msg = err && err.message ? String(err.message) : 'unknown_error';
+
+  if (code === 'DATABASE_CONFIG_MISSING') {
+    return sendJson(res, 503, {
+      error: {
+        code,
+        message: msg,
+        requestId,
+        retryable: false,
+        details: [
+          {
+            field: 'env',
+            issue:
+              'Set DATABASE_URL in microservices/comprehension-service/.env for local TCP, or use READON_DATABASE_NAME + Cloud SQL socket on Cloud Run.',
+          },
+        ],
+      },
+    });
+  }
+
+  if (
+    code === 'ECONNREFUSED'
+    || code === 'ENOENT'
+    || (msg.includes('connect ENOENT') && msg.includes('cloudsql'))
+    || (msg.includes('/cloudsql/') && msg.includes('ENOENT'))
+  ) {
+    return sendJson(res, 503, {
+      error: {
+        code: 'database_connection_failed',
+        message: msg,
+        requestId,
+        retryable: true,
+        details: [
+          {
+            field: 'hint',
+            issue:
+              'Local: use DATABASE_URL with TCP (or Cloud SQL Auth Proxy). If DATABASE_URL is set, it is preferred over socket host.',
+          },
+        ],
+      },
+    });
+  }
+
+  if (code === '28P01' || msg.toLowerCase().includes('password authentication')) {
+    return sendJson(res, 503, {
+      error: {
+        code: 'database_auth_failed',
+        message: msg,
+        requestId,
+        retryable: false,
+        details: [],
+      },
+    });
+  }
+
   return sendJson(res, 500, {
     error: {
       code: 'persistence_error',
-      message: 'Comprehension persistence is unavailable.',
-      requestId: `req_${Date.now().toString(36)}`,
+      message: msg,
+      requestId,
       retryable: true,
-      details: [],
+      details: [{ field: 'cause', issue: msg.slice(0, 400) }],
     },
   });
 }
@@ -148,7 +206,7 @@ async function handleComprehensionRoutes({ req, res, url, path, sendJson, logger
         badJson(sendJson, res);
       } else {
         logger.error('comprehension_generate_failed', err);
-        serverError(sendJson, res);
+        sendPersistenceAwareError(sendJson, res, err);
       }
     }
 
@@ -166,7 +224,7 @@ async function handleComprehensionRoutes({ req, res, url, path, sendJson, logger
       sendJson(res, result.statusCode, result.body);
     } catch (err) {
       logger.error('comprehension_history_failed', err);
-      serverError(sendJson, res);
+      sendPersistenceAwareError(sendJson, res, err);
     }
     return true;
   }
@@ -183,7 +241,7 @@ async function handleComprehensionRoutes({ req, res, url, path, sendJson, logger
       sendJson(res, result.statusCode, result.body);
     } catch (err) {
       logger.error('comprehension_get_failed', err);
-      serverError(sendJson, res);
+      sendPersistenceAwareError(sendJson, res, err);
     }
     return true;
   }
@@ -207,7 +265,7 @@ async function handleComprehensionRoutes({ req, res, url, path, sendJson, logger
         badJson(sendJson, res);
       } else {
         logger.error('comprehension_answers_failed', err);
-        serverError(sendJson, res);
+        sendPersistenceAwareError(sendJson, res, err);
       }
     }
 

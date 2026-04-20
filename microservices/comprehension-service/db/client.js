@@ -13,6 +13,13 @@ function readNumberEnv(name, defaultValue) {
 }
 
 function databaseConfig() {
+  // Local / TCP: prefer explicit DATABASE_URL when set so Cloud SQL socket paths are not used by mistake.
+  // Cloud Run can set DATABASE_URL from Secret Manager, or omit it and use READON_DATABASE_NAME + socket.
+  const connectionString = readEnv('DATABASE_URL');
+  if (connectionString) {
+    return { connectionString };
+  }
+
   const cloudSqlConnectionName = readEnv('CLOUDSQL_CONNECTION_NAME');
   const host = readEnv('READON_DATABASE_HOST') || process.env.PGHOST || (
     cloudSqlConnectionName ? `/cloudsql/${cloudSqlConnectionName}` : ''
@@ -29,9 +36,7 @@ function databaseConfig() {
     };
   }
 
-  const connectionString = readEnv('DATABASE_URL');
-
-  return connectionString ? { connectionString } : null;
+  return null;
 }
 
 function createMissingDatabaseConfigError() {
@@ -83,7 +88,7 @@ async function verifyDatabaseConnection() {
     return {
       ok: false,
       code: 'DATABASE_CONFIG_MISSING',
-      message: 'READON_DATABASE_NAME or DATABASE_URL is not configured; Comprehension persistence endpoints will return persistence_error.',
+      message: 'DATABASE_URL or READON_DATABASE_NAME is not configured; Comprehension persistence will fail.',
     };
   }
 

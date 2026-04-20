@@ -1,3 +1,6 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 const { startReadOnService } = require('../common/httpServer');
 const { verifyDatabaseConnection } = require('./db/client');
 const { handleComprehensionRoutes } = require('./routes');
