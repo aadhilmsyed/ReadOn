@@ -14,18 +14,19 @@ const express = require('express');
 const { closeAllPools } = require('./db/pools');
 const historyRouter = require('./routes/history');
 const creditsRouter = require('./routes/credits');
+const readerStoriesRouter = require('./routes/readerStories');
 
 const SERVICE_NAME = process.env.SERVICE_NAME || 'dashboard-service';
 const SERVICE_VERSION = process.env.SERVICE_VERSION || 'local-dev';
-const PORT = Number(process.env.PORT || 4100);
+const PORT = Number(process.env.PORT || 3005);
 const HOST = process.env.HOST || '0.0.0.0';
 
 const app = express();
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json({ limit: process.env.READON_DASHBOARD_JSON_LIMIT || '48mb' }));
 
 app.use((req, res, next) => {
   res.set('access-control-allow-origin', process.env.CORS_ORIGIN || '*');
-  res.set('access-control-allow-methods', 'GET,POST,OPTIONS');
+  res.set('access-control-allow-methods', 'GET,POST,PATCH,OPTIONS');
   res.set('access-control-allow-headers', 'content-type');
   if (req.method === 'OPTIONS') return res.status(204).end();
   next();
@@ -51,6 +52,7 @@ app.get('/meta', (_req, res) =>
 
 app.use('/history', historyRouter);
 app.use('/credits', creditsRouter);
+app.use('/reader-stories', readerStoriesRouter);
 
 app.use((req, res) => res.status(404).json({ error: 'not_found', path: req.path }));
 
