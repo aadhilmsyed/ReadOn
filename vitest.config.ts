@@ -19,6 +19,7 @@ export default defineConfig({
       '@phonics': path.resolve(__dirname, 'microservices/phonics-service'),
       '@shared': path.resolve(__dirname, 'shared'),
       '@orchestrators': path.resolve(__dirname, 'orchestrators'),
+      '@views': path.resolve(__dirname, 'views'),
     },
   },
 });
