@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { serviceDownMessage, LOCAL_SERVICE_URLS, START_COMMANDS } from '@shared/http/serviceUnavailable';
+
 function createRequestId() {
   return `req_${Date.now().toString(36)}`;
 }
@@ -16,7 +18,7 @@ function errorBody(code: string, message: string, retryable: boolean, details: A
   };
 }
 
-const DEFAULT_COMPREHENSION_URL = 'http://127.0.0.1:8080';
+const DEFAULT_COMPREHENSION_URL = LOCAL_SERVICE_URLS.comprehension;
 
 function comprehensionServiceUrl(path: string) {
   const baseUrl = (process.env.READON_COMPREHENSION_SERVICE_URL || DEFAULT_COMPREHENSION_URL).trim();
@@ -30,12 +32,13 @@ function comprehensionServiceUrl(path: string) {
 
 export async function forwardComprehensionRequest(path: string, init: RequestInit = {}) {
   const url = comprehensionServiceUrl(path);
+  const expected = (process.env.READON_COMPREHENSION_SERVICE_URL || DEFAULT_COMPREHENSION_URL).replace(/\/$/, '');
 
   if (!url) {
     return NextResponse.json(
       errorBody(
         'service_url_not_configured',
-        'READON_COMPREHENSION_SERVICE_URL is not set to a reachable URL (default is http://127.0.0.1:8080).',
+        `READON_COMPREHENSION_SERVICE_URL is not set. For local dev use ${DEFAULT_COMPREHENSION_URL}. Start: ${START_COMMANDS.comprehension}`,
         false,
       ),
       { status: 503 },
@@ -61,9 +64,14 @@ export async function forwardComprehensionRequest(path: string, init: RequestIni
     const body = contentType.includes('application/json') ? await response.json() : await response.text();
 
     return NextResponse.json(body, { status: response.status });
-  } catch {
+  } catch (e) {
+    const cause = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
-      errorBody('microservice_unavailable', 'Comprehension service is unavailable.', true),
+      errorBody(
+        'microservice_unavailable',
+        serviceDownMessage('Comprehension service', expected, START_COMMANDS.comprehension, cause),
+        true,
+      ),
       { status: 502 },
     );
   }

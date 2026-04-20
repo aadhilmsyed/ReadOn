@@ -1,14 +1,11 @@
 /**
- * Application route: accepts story text, generates a unique story ID server-side,
- * then forwards to the phonics microservice controller.
- * Clients may omit `storyId`; optional `storyId` is preserved for tests / legacy callers.
+ * BFF: forwards to the phonics microservice over HTTP (`POST /process`).
  */
-import '../loadPhonicsEnv';
 import { randomUUID } from 'crypto';
 
 import { NextResponse } from 'next/server';
 
-import { handlePostProcessPhonics } from '@phonics/routes/handlers';
+import { phonicsDownError, phonicsServiceBaseUrl } from '@/lib/microserviceHttp';
 
 type IncomingBody = {
   storyText?: unknown;
@@ -40,6 +37,35 @@ export async function POST(request: Request) {
     typeof raw.storyId === 'string' && raw.storyId.trim() ? raw.storyId.trim() : '';
   const storyId = existingId || randomUUID();
 
-  const result = await handlePostProcessPhonics({ storyId, storyText });
-  return NextResponse.json(result.body, { status: result.status });
+  const base = phonicsServiceBaseUrl();
+  const url = `${base}/process`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ storyId, storyText }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(Number(process.env.READON_PHONICS_FETCH_TIMEOUT_MS ?? 120000)),
+    });
+
+    const text = await res.text();
+    let parsed: unknown = text;
+    try {
+      parsed = text ? JSON.parse(text) : {};
+    } catch {
+      parsed = { raw: text };
+    }
+
+    return NextResponse.json(parsed as object, { status: res.status });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'fetch_failed';
+    return NextResponse.json(
+      {
+        success: false,
+        error: phonicsDownError(msg),
+      },
+      { status: 502 },
+    );
+  }
 }

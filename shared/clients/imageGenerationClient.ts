@@ -25,11 +25,8 @@ export interface ImageGenerationClientConfig {
 const DEFAULT_TIMEOUT_MS = 45000;
 const DEFAULT_MAX_RETRIES = 1;
 
-/** Same-origin BFF proxy — keeps service URL and keys on the server. */
-function getImageServiceUrl(): string {
-  if (typeof window === 'undefined') {
-    return '/api/images/generate';
-  }
+/** Same-origin BFF — full path to the Next route handler `POST /api/images/generate` (do not append `/images/generate` again). */
+function getImageBffUrl(): string {
   return '/api/images/generate';
 }
 
@@ -46,7 +43,7 @@ async function postWithTimeout(url: string, body: unknown, timeoutMs: number): P
   try {
     return await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -55,19 +52,43 @@ async function postWithTimeout(url: string, body: unknown, timeoutMs: number): P
   }
 }
 
+async function parseJsonResponse(
+  response: Response,
+  requestUrl: string,
+): Promise<GeneratedImageClientResult> {
+  const contentType = response.headers.get('content-type') || '';
+  const text = await response.text();
+
+  if (!contentType.includes('application/json')) {
+    const preview = text.trim().slice(0, 200).replace(/\s+/g, ' ');
+    throw new Error(
+      `Image BFF ${requestUrl} returned non-JSON (${contentType || 'unknown type'}, status ${response.status}). ` +
+        `Expected JSON from /api/images/generate. Preview: ${preview || '(empty)'}`,
+    );
+  }
+
+  try {
+    return JSON.parse(text) as GeneratedImageClientResult;
+  } catch {
+    throw new Error(
+      `Image BFF ${requestUrl} returned invalid JSON (status ${response.status}). Preview: ${text.slice(0, 120)}`,
+    );
+  }
+}
+
 export async function generateImage(
   request: GenerateImageClientRequest,
-  config: ImageGenerationClientConfig = {}
+  config: ImageGenerationClientConfig = {},
 ): Promise<GeneratedImageClientResult> {
-  const baseUrl = config.baseUrl || getImageServiceUrl();
+  const url = config.baseUrl || getImageBffUrl();
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const response = await postWithTimeout(`${baseUrl}/images/generate`, request, timeoutMs);
-      const data = (await response.json()) as GeneratedImageClientResult;
+      const response = await postWithTimeout(url, request, timeoutMs);
+      const data = await parseJsonResponse(response, url);
 
       if (!response.ok || !data.success || !data.images?.[0]?.url) {
         throw new Error(data.error?.message || 'Image generation failed for this paragraph.');

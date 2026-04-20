@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 
+import { serviceDownMessage, LOCAL_SERVICE_URLS, START_COMMANDS } from '@shared/http/serviceUnavailable';
+
 export const runtime = 'nodejs';
 
-function imageServiceBase(): string | null {
+function imageServiceBase(): string {
   const a = process.env.READON_IMAGE_GENERATION_SERVICE_URL?.trim();
   const b = process.env.READON_VISUALIZATION_SERVICE_URL?.trim();
   const raw = a || b;
   if (!raw || raw === 'REPLACE_ME' || raw === 'NULL') {
-    return 'http://127.0.0.1:3001';
+    return LOCAL_SERVICE_URLS.imageGeneration.replace(/\/$/, '');
   }
   return raw.replace(/\/$/, '');
 }
@@ -44,7 +46,12 @@ export async function POST(request: Request) {
       {
         success: false,
         error: {
-          message: `Image service unreachable at ${url}. Start microservices/image-generation-service or set READON_IMAGE_GENERATION_SERVICE_URL. (${msg})`,
+          message: serviceDownMessage(
+            'Image generation service',
+            base,
+            START_COMMANDS.imageGeneration,
+            msg,
+          ),
         },
       },
       { status: 502 },
