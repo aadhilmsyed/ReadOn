@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server';
 import { rechargeUserCredits } from '@orchestrators/dashboard/dashboardOrchestrator';
+import { getSessionUserFromRequest } from '@/lib/auth/getSessionUser';
 
 export const dynamic = 'force-dynamic';
 
 interface Body { dollars?: number }
 
 export async function POST(request: Request, { params }: { params: { userId: string } }) {
-  const userId = decodeURIComponent(params.userId).trim();
+  const session = await getSessionUserFromRequest(request);
+  if (!session) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const userId = decodeURIComponent(params.userId).trim().toLowerCase();
   if (!userId) return NextResponse.json({ error: 'invalid_user_id' }, { status: 400 });
+  if (userId !== session.email) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
 
   let body: Body;
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'invalid_json' }, { status: 400 }); }
