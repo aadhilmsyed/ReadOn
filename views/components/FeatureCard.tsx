@@ -8,6 +8,7 @@ export function FeatureCard({
   description,
   icon,
   onNavigate,
+  isDisabled,
 }: {
   href: string;
   title: string;
@@ -15,6 +16,7 @@ export function FeatureCard({
   icon: IconType;
   /** When set, navigation is handled in JS (e.g. stash text then route). */
   onNavigate?: () => void | Promise<void>;
+  isDisabled?: boolean;
 }) {
   const shared = {
     height: 'auto' as const,
@@ -29,7 +31,12 @@ export function FeatureCard({
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.3s ease',
-    _hover: { transform: 'translateY(-4px)', shadow: 'xl', bg: 'blue.50' },
+    isDisabled: Boolean(isDisabled),
+    opacity: isDisabled ? 0.55 : undefined,
+    cursor: isDisabled ? ('not-allowed' as const) : undefined,
+    _hover: isDisabled
+      ? {}
+      : { transform: 'translateY(-4px)', shadow: 'xl', bg: 'blue.50' },
   };
 
   const inner = (
@@ -53,7 +60,7 @@ export function FeatureCard({
   }
 
   return (
-    <Button as={Link} href={href} {...shared}>
+    <Button as={Link} href={href} {...shared} aria-disabled={isDisabled}>
       {inner}
     </Button>
   );
