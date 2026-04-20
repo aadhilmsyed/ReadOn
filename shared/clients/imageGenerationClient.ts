@@ -1,5 +1,7 @@
 export interface GenerateImageClientRequest {
   prompt: string;
+  storyId?: string;
+  paragraphIndex?: number;
   style?: string;
   theme?: string;
   ageGroup?: string;

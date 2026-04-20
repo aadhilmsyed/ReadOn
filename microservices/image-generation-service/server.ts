@@ -209,4 +209,17 @@ app.listen(config.port, HOST, () => {
   logger.info(`Image Generation Service listening on ${HOST}:${config.port}`);
   logger.info(`Health: http://127.0.0.1:${config.port}/health`);
   logger.info(`Generate: POST http://127.0.0.1:${config.port}/images/generate`);
+  
+  // Log GCS configuration
+  logger.info('Google Cloud Storage Configuration:', {
+    projectId: process.env.GCP_PROJECT_ID || 'NOT_SET',
+    bucket: process.env.READON_STORAGE_BUCKET || 'NOT_SET',
+    credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS || 'NOT_SET',
+    credentialsExists: process.env.GOOGLE_APPLICATION_CREDENTIALS 
+      ? require('fs').existsSync(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+      : false,
+  });
+  
+  logger.info('Storage driver:', { driver: config.storage.driver });
+  logger.info('Database:', { name: config.database.name });
 });

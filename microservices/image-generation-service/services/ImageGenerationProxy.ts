@@ -204,6 +204,7 @@ export class ImageGenerationProxy implements IImageGenerationService {
       await this.repository.update(requestId, {
         status: result.success ? GenerationStatus.COMPLETED : GenerationStatus.FAILED,
         imageUrls: result.images?.map(img => img.url) || [],
+        storageKeys: result.images?.map(img => img.storageKey).filter((key): key is string => !!key) || [],
         errorMessage: result.error?.message,
       });
       this.logger.info('Metadata updated', { requestId, status: result.success ? 'COMPLETED' : 'FAILED' });

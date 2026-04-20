@@ -135,6 +135,7 @@ export class ImageGenerationController {
       theme: typeof data.theme === 'string' ? data.theme : undefined,
       ageGroup: typeof data.ageGroup === 'string' ? data.ageGroup : undefined,
       numImages: typeof data.numImages === 'number' ? data.numImages : 1,
+      paragraphIndex: typeof data.paragraphIndex === 'number' ? data.paragraphIndex : undefined,
     };
   }
 }

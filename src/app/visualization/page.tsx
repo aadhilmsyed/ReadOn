@@ -126,9 +126,15 @@ function cacheStorybook(story: string, scenes: ParagraphScene[]): void {
   window.sessionStorage.setItem(STORYBOOK_CACHE_KEY, JSON.stringify({ story, scenes }));
 }
 
-async function generateSceneImage(prompt: string): Promise<GeneratedImageClientResult> {
+async function generateSceneImage(
+  prompt: string,
+  storyId: string,
+  paragraphIndex: number
+): Promise<GeneratedImageClientResult> {
   return generateImage({
     prompt,
+    storyId,
+    paragraphIndex,
     style: 'storybook illustration',
     theme: 'reading visualization',
     ageGroup: 'children',
@@ -415,6 +421,8 @@ function VisualizationPageInner() {
 
     async function generateAllScenes() {
       const workingScenes = [...startScenes];
+      // Generate a unique storyId for this session
+      const sessionStoryId = `story-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       for (let index = 0; index < workingScenes.length; index += 1) {
         if (cancelled) {
@@ -430,7 +438,11 @@ function VisualizationPageInner() {
         setScenes([...workingScenes]);
 
         try {
-          const result = await generateSceneImage(workingScenes[index].prompt);
+          const result = await generateSceneImage(
+            workingScenes[index].prompt,
+            sessionStoryId,
+            index
+          );
           const completedScene = {
             ...workingScenes[index],
             imageUrl: result.images?.[0]?.url,

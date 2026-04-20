@@ -119,6 +119,11 @@ export class PostgresImageMetadataRepository implements IImageMetadataRepository
       values.push(updates.cached);
     }
 
+    if (updates.storageKeys !== undefined) {
+      setClauses.push(`Storage_Keys = $${paramIndex++}`);
+      values.push(updates.storageKeys);
+    }
+
     if (setClauses.length === 0) return;
 
     setClauses.push(`Updated_At = CURRENT_TIMESTAMP`);

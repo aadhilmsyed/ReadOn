@@ -9,6 +9,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
     "@types/cors": "^2.8.19",
     "cors": "^2.8.6",
     "dotenv": "^16.3.1",

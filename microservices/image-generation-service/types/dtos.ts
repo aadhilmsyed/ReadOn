@@ -2,6 +2,7 @@ export interface GenerateImageRequestDTO {
   storyId?: string;
   userId?: string;
   prompt: string;
+  paragraphIndex?: number;
   style?: string;
   theme?: string;
   ageGroup?: string;
