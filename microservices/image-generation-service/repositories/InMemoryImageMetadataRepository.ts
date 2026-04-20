@@ -18,6 +18,12 @@ export class InMemoryImageMetadataRepository implements IImageMetadataRepository
     return metadata ? { ...metadata } : null;
   }
 
+  async findByStoryId(storyId: string): Promise<ImageGenerationMetadata[]> {
+    return Array.from(this.storage.values())
+      .filter((m) => m.storyId === storyId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }
+
   async update(id: string, updates: Partial<ImageGenerationMetadata>): Promise<void> {
     try {
       const existing = this.storage.get(id);

@@ -60,7 +60,7 @@ function readStorageDriver(): StorageDriver {
 }
 
 export const config: AppConfig = {
-  port: readInt('PORT', 3001),
+  port: readInt('PORT', 3003),
   aiProvider: {
     apiKey: process.env.AI_IMAGE_API_KEY || '',
     endpoint: process.env.AI_IMAGE_API_ENDPOINT || 'https://api.openai.com/v1/images/generations',
@@ -89,7 +89,8 @@ export const config: AppConfig = {
   },
 };
 
-export function validateConfig(appConfig: AppConfig = config): void {
+/** Lists env vars required before image generation can succeed (used by `/health` and `/ready`). */
+export function listMissingGenerationConfig(appConfig: AppConfig = config): string[] {
   const missing: string[] = [];
 
   if (!appConfig.aiProvider.apiKey) missing.push('AI_IMAGE_API_KEY');
@@ -102,6 +103,11 @@ export function validateConfig(appConfig: AppConfig = config): void {
     if (!appConfig.database.password) missing.push('DB_PASSWORD');
   }
 
+  return missing;
+}
+
+export function validateConfig(appConfig: AppConfig = config): void {
+  const missing = listMissingGenerationConfig(appConfig);
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }

@@ -135,7 +135,7 @@ export class PostgresImageMetadataRepository implements IImageMetadataRepository
 
   async findByStoryId(storyId: string): Promise<ImageGenerationMetadata[]> {
     const result = await this.pool.query(
-      'SELECT * FROM Image_Generation_Metadata WHERE Story_ID = $1 ORDER BY Created_At DESC',
+      'SELECT * FROM Image_Generation_Metadata WHERE Story_ID = $1 ORDER BY Created_At ASC',
       [storyId]
     );
     
