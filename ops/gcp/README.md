@@ -6,7 +6,7 @@ This directory deploys the **skeleton only** of ReadOn (no business logic): main
 
 1. A Google Cloud project (e.g. `readon-492106`).
 2. `gcloud` installed and authenticated (local use).
-3. For GitHub Actions: Workload Identity Federation configured per [docs/github-actions-setup.md](../../docs/github-actions-setup.md).
+3. If you deploy from GitHub Actions: Workload Identity Federation configured per [docs/github-actions-setup.md](../../docs/github-actions-setup.md) (optional; this repo does not ship a push-to-deploy workflow).
 
 ## Environment model
 
@@ -37,8 +37,8 @@ Images are built with `gcloud builds submit` (no local Docker required). Dockerf
 
 ## CI/CD
 
-- [.github/workflows/deploy.yml](../../.github/workflows/deploy.yml) — push to `main` or `dev`
-- [docs/cicd-overview.md](../../docs/cicd-overview.md)
+- Deploy from this directory using the scripts above; see [docs/cicd-overview.md](../../docs/cicd-overview.md).
+- `.github/workflows/` may still contain non-deploy workflows (for example Sigrid).
 
 ## References
 
