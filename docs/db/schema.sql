@@ -5,7 +5,7 @@
 --
 --   phonics
 --   comprehension
---   images          -- visualization-service uses this database (legacy name)
+--   images          -- image-generation-service uses this database (legacy name)
 --   audiobook
 --
 -- Each microservice owns the `stories` table inside its own logical DB.

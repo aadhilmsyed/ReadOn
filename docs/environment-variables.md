@@ -44,7 +44,10 @@ When `READON_DEPLOY_ENV=test`:
 
 ## Service URLs (main app)
 
-- `READON_AUDIOBOOK_SERVICE_URL`, `READON_PHONICS_SERVICE_URL`, `READON_COMPREHENSION_SERVICE_URL`, `READON_VISUALIZATION_SERVICE_URL`
+- `READON_AUDIOBOOK_SERVICE_URL`, `READON_PHONICS_SERVICE_URL`, `READON_COMPREHENSION_SERVICE_URL`, `READON_IMAGE_GENERATION_SERVICE_URL`
+  - Optional legacy alias: `READON_VISUALIZATION_SERVICE_URL` (same target as image generation).
+  - Local defaults are documented in `.env.example` (ports **3001–3005** for microservices; main app **3000**).
+- Comprehension microservice `DATABASE_URL` (in `microservices/comprehension-service/.env`) is preferred over `READON_DATABASE_NAME` + Cloud SQL socket when set — see `microservices/comprehension-service/db/client.js`.
   - `ops/gcp/deploy-stack.sh` sets these on the **main** service after microservices deploy.
   - Standalone `deploy-main.sh` leaves them empty unless exported.
 

@@ -20,7 +20,7 @@ ReadOn/
 ├── microservices/      # One directory per independently deployable service
 │   ├── phonics-service/        (routes, controllers, models, services, Dockerfile, server.js)
 │   ├── comprehension-service/  (same MVC shape)
-│   ├── visualization-service/  (same MVC shape)
+│   ├── image-generation-service/  (same MVC shape)
 │   └── audiobook-service/      (same MVC shape)
 ├── shared/             # Cross-cutting contracts: types, session, content, helpers
 ├── ops/gcp/            # Infrastructure-as-code (Cloud Run, Cloud SQL, GCS, IAM)

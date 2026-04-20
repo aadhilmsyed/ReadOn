@@ -30,7 +30,8 @@ The application currently runs as a static Next.js and Chakra UI experience with
 │   ├── audiobook-service/
 │   ├── comprehension-service/
 │   ├── phonics-service/
-│   └── visualization-service/
+│   ├── image-generation-service/
+│   └── dashboard-service/
 ├── orchestrators/
 │   ├── auth/
 │   ├── dashboard/
@@ -72,14 +73,42 @@ Contains feature-specific service skeletons organized as lightweight MVC-style s
 ### `shared/`
 Contains reusable interfaces, mock content, session abstractions, and common helpers such as the shared `notImplemented()` placeholder used by backend-oriented skeleton code.
 
-## Running the App
+## Running the App (local dev)
+
+The **Next.js app** (orchestrator / BFF) and each **microservice** are separate processes. Configure the repo root `.env` with microservice base URLs (see `.env.example`), and put secrets and DB URLs in each service’s own `.env` under `microservices/<name>/.env`.
+
+**Fixed local ports**
+
+| Process | Port |
+| --- | --- |
+| Main Next.js app | 3000 |
+| phonics-service | 3001 |
+| comprehension-service | 3002 |
+| image-generation-service | 3003 |
+| audiobook-service | 3004 |
+| dashboard-service | 3005 |
+
+**Typical startup (one terminal per service)**
 
 ```bash
 npm install
-npm run dev
+# optional: npm install in each microservices/*/ that has its own package.json
+
+npm run dev                              # main app → http://127.0.0.1:3000
+npm run dev:phonics                      # http://127.0.0.1:3001
+npm run dev:comprehension                # http://127.0.0.1:3002
+npm run dev:image-generation             # http://127.0.0.1:3003
+npm run dev:audiobook                    # http://127.0.0.1:3004
+npm run dev:dashboard                    # http://127.0.0.1:3005
 ```
 
-The app runs from the repository root using Next.js.
+**Optional:** `npm run dev:all` runs the main app plus all of the above via `concurrently` (local only).
+
+**Health checks:** each microservice exposes `GET /health` (and usually `/live`, `/ready`, `/meta` where applicable). With nothing bound on 3001–3005, run `npm run verify:services` to spawn each service briefly and `curl` its `/health`.
+
+**Deeper checks:** `npm run verify:endpoints` exercises `/health`, `/live`, `/ready`, `/meta`, and one representative feature route per microservice (ports 3001–3005). **Comprehension local DB:** set `DATABASE_URL` in `microservices/comprehension-service/.env`; it takes precedence over `READON_DATABASE_NAME` + Cloud SQL socket (see that service’s `.env.example`).
+
+**Cloud Run:** containers listen on `PORT` (typically **8080** from the platform). URLs between services are set at deploy time, not via localhost.
 
 ## Frontend Behavior
 
