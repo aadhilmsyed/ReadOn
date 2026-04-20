@@ -16,22 +16,23 @@ import {
   AlertDialogOverlay,
   Box,
   Button,
+  FormControl,
+  FormLabel,
   Heading,
   HStack,
+  Input,
   SimpleGrid,
+  Spinner,
   Text,
   Textarea,
   useDisclosure,
+  useToast,
   VStack,
 } from '@chakra-ui/react';
 
-import {
-  PHONICS_SESSION_HOME_FLASH_ERROR_KEY,
-  PHONICS_SESSION_STORY_TEXT_KEY,
-} from '@shared/constants/phonicsClient';
-import { featureDefinitions } from '@shared/content/features';
+import { PHONICS_SESSION_HOME_FLASH_ERROR_KEY } from '@shared/constants/phonicsClient';
+import { STORY_TITLE_MAX_LENGTH } from '@/lib/story/deriveStoryTitle';
 import type { FeatureKey } from '@shared/types/features';
-import { FeatureCard } from '@views/components/FeatureCard';
 import { AppShell } from '@views/components/AppShell';
 import { useSession } from '@views/providers/SessionProvider';
 import { useText } from '@views/providers/TextProvider';
@@ -42,13 +43,15 @@ const VALID_FEATURES: ReadonlyArray<FeatureKey> = ['phonics', 'comprehension', '
 export default function HomePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { inputText, setInputText } = useText();
+  const toast = useToast();
+  const { inputText, setInputText, storyTitle, setStoryTitle } = useText();
   const { session, isReady } = useSession();
   const authDialog = useDisclosure();
   const cancelRef = React.useRef<HTMLButtonElement>(null);
   const overLimit = inputText.length > CHARACTER_LIMIT;
   const [phonicsInputError, setPhonicsInputError] = useState<string | null>(null);
   const [phonicsFlashError, setPhonicsFlashError] = useState<string | null>(null);
+  const [generatingStory, setGeneratingStory] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -59,12 +62,36 @@ export default function HomePage() {
     }
   }, []);
 
-  // Prefill reading text when opened from dashboard history (?storyId=&service=)
+  // Prefill from a saved reader story (?storyId= only) or legacy per-feature dashboard link
   useEffect(() => {
     const storyId = searchParams.get('storyId');
     const service = searchParams.get('service') as FeatureKey | null;
-    if (!storyId || !service || !VALID_FEATURES.includes(service)) return;
+    if (!storyId) return;
+
     let cancelled = false;
+
+    if (!service) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}`, {
+            cache: 'no-store',
+            credentials: 'include',
+          });
+          if (!res.ok) return;
+          const story = await res.json();
+          if (cancelled) return;
+          if (typeof story.sourceText === 'string') setInputText(story.sourceText);
+          if (typeof story.title === 'string') setStoryTitle(story.title);
+        } catch {
+          /* silent */
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!VALID_FEATURES.includes(service)) return;
     (async () => {
       try {
         const res = await fetch(`/api/dashboard/stories/${service}/${storyId}`, {
@@ -75,6 +102,7 @@ export default function HomePage() {
         const story = await res.json();
         if (cancelled) return;
         if (typeof story.source_text === 'string') setInputText(story.source_text);
+        if (typeof story.title === 'string') setStoryTitle(story.title);
       } catch {
         /* silent — user can still type fresh content */
       }
@@ -85,52 +113,92 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePhonicsPractice = useCallback(() => {
-    const trimmed = inputText.trim();
-    if (!trimmed) {
-      setPhonicsInputError('Add some reading text in the box above before starting Phonics Practice.');
-      return;
-    }
-    setPhonicsInputError(null);
-    sessionStorage.setItem(PHONICS_SESSION_STORY_TEXT_KEY, trimmed);
-    router.push('/phonics');
-  }, [inputText, router]);
-
-  const launchAudiobook = useCallback(() => {
-    const trimmed = inputText.trim();
-    if (trimmed) {
-      sessionStorage.setItem('audiobook:sourceText', trimmed);
-      router.push('/audiobook/player');
-      return;
-    }
-    router.push('/audiobook');
-  }, [router, inputText]);
-
   const gateFeature = useCallback(
-    (run: () => void) => {
+    (run: () => void | Promise<void>) => {
       if (!isReady) return;
       if (!session) {
         authDialog.onOpen();
         return;
       }
-      run();
+      void run();
     },
     [authDialog, isReady, session],
   );
 
-  const handleFeatureNavigate = useCallback(
-    (key: FeatureKey) => {
-      gateFeature(() => {
-        if (key === 'phonics') handlePhonicsPractice();
-        else if (key === 'audiobook') launchAudiobook();
-        else {
-          const route = featureDefinitions.find((f) => f.key === key)?.route;
-          if (route) router.push(route);
+  const handleGenerateStory = useCallback(() => {
+    gateFeature(async () => {
+      const trimmed = inputText.trim();
+      const trimmedTitle = storyTitle.trim();
+      if (!trimmedTitle) {
+        toast({
+          status: 'error',
+          title: 'Add a story title first',
+          description: 'Title is required before generating.',
+          duration: 4000,
+          isClosable: true,
+        });
+        return;
+      }
+      if (!trimmed) {
+        toast({
+          status: 'error',
+          title: 'Add some reading text first',
+          description: 'Enter a story in the box above, then generate.',
+          duration: 4000,
+          isClosable: true,
+        });
+        return;
+      }
+      if (overLimit) {
+        toast({ status: 'error', title: 'Text is too long', duration: 3000, isClosable: true });
+        return;
+      }
+      setGeneratingStory(true);
+      try {
+        const res = await fetch('/api/stories/generate', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            sourceText: trimmed,
+            title: trimmedTitle,
+          }),
+        });
+        const body = (await res.json()) as { storyId?: string; error?: string; message?: string; required?: number; balance?: number };
+        if (res.status === 402) {
+          toast({
+            status: 'warning',
+            title: 'Not enough credits',
+            description: `You need ${body.required ?? 20} credits to generate a full story (balance: ${body.balance ?? '—'}).`,
+            duration: 6000,
+            isClosable: true,
+          });
+          return;
         }
-      });
-    },
-    [gateFeature, handlePhonicsPractice, launchAudiobook, router],
-  );
+        if (!res.ok || !body.storyId) {
+          toast({
+            status: 'error',
+            title: 'Could not generate story',
+            description: body.message || body.error || `HTTP ${res.status}`,
+            duration: 5000,
+            isClosable: true,
+          });
+          return;
+        }
+        router.push(`/features/${encodeURIComponent(body.storyId)}`);
+      } catch (e) {
+        toast({
+          status: 'error',
+          title: 'Network error',
+          description: e instanceof Error ? e.message : String(e),
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setGeneratingStory(false);
+      }
+    });
+  }, [gateFeature, inputText, overLimit, router, storyTitle, toast]);
 
   return (
     <AppShell>
@@ -149,9 +217,8 @@ export default function HomePage() {
             Your AI-Powered Reading Companion
           </Text>
           <Text fontSize="lg" color="gray.600" maxW="4xl" lineHeight="tall">
-            Read On is an AI-powered reading companion designed to enhance your learning experience through
-            multiple interactive tools. Start by inputting your text in the box below, then select one of the
-            four distinct learning modes:
+            Read On is an AI-powered reading companion. Add your text below, then generate a story to unlock
+            phonics, comprehension, visualization, and read-aloud — all prepared for you in one step.
           </Text>
         </VStack>
 
@@ -159,12 +226,29 @@ export default function HomePage() {
           <VStack spacing={4} align="stretch">
             <VStack spacing={1}>
               <Text fontSize="xl" fontWeight="semibold" color="gray.700">
-                Add Reading Text
+                Your story
               </Text>
               <Text fontSize="sm" color="gray.500">
-                This text is stored client-side so it remains available as you move between pages.
+                Add a title and reading text. When you generate, they are saved with your account on the server.
               </Text>
             </VStack>
+            <FormControl>
+              <FormLabel fontWeight="semibold" color="gray.700" mb={1}>
+                Title
+              </FormLabel>
+              <Input
+                placeholder="e.g. The brave little turtle"
+                size="lg"
+                value={storyTitle}
+                maxLength={STORY_TITLE_MAX_LENGTH}
+                onChange={(e) => setStoryTitle(e.target.value)}
+                borderColor="gray.200"
+                _focus={{ borderColor: 'blue.400', boxShadow: 'none' }}
+              />
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                {storyTitle.length}/{STORY_TITLE_MAX_LENGTH} characters
+              </Text>
+            </FormControl>
             <Textarea
               placeholder="Type or paste your text here..."
               size="lg"
@@ -199,26 +283,27 @@ export default function HomePage() {
                 Sign in to unlock Phonics, Comprehension, Visualization, and Audiobook.
               </Text>
             </HStack>
+            <Button
+              w="100%"
+              size="lg"
+              py={8}
+              fontSize="xl"
+              colorScheme="purple"
+              bgGradient="linear(to-r, blue.400, purple.500, pink.500)"
+              color="white"
+              _hover={{ bgGradient: 'linear(to-r, blue.500, purple.600, pink.600)', opacity: 0.95 }}
+              onClick={handleGenerateStory}
+              isLoading={generatingStory}
+              loadingText="Generating Story..."
+              isDisabled={!isReady || overLimit || !storyTitle.trim()}
+            >
+              Generate Story
+            </Button>
+            <Text fontSize="sm" color="gray.500" textAlign="center">
+              Signed-in learners only. Up to four experiences run together; credits apply only to features that succeed.
+            </Text>
           </VStack>
         </Box>
-
-        <VStack spacing={6} align="stretch">
-          <Heading as="h2" size="lg" textAlign="center" color="blue.600">
-            Choose a Learning Experience
-          </Heading>
-          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-            {featureDefinitions.map((feature) => (
-              <FeatureCard
-                key={feature.key}
-                href={feature.route}
-                title={feature.title}
-                description={feature.shortDescription}
-                icon={feature.icon}
-                onNavigate={() => handleFeatureNavigate(feature.key)}
-              />
-            ))}
-          </SimpleGrid>
-        </VStack>
 
         <Box maxW="1200px" mx="auto">
           <VStack align="stretch" spacing={8}>
@@ -333,31 +418,6 @@ export default function HomePage() {
               </Box>
             </SimpleGrid>
 
-            <Box
-              p={6}
-              borderWidth="1px"
-              borderRadius="lg"
-              borderColor="gray.200"
-              bg="white"
-              transition="all 0.3s ease"
-              _hover={{
-                transform: 'translateY(-2px)',
-                shadow: 'md',
-                bgGradient: 'linear(to-br, white, blue.50)',
-              }}
-            >
-              <Heading as="h3" size="md" color="blue.600" mb={4}>
-                5. User Dashboard
-              </Heading>
-              <Text fontSize="lg" lineHeight="tall">
-                The Read On dashboard gives learners a personal home base for everything they create and explore.
-                It is designed to bring together profile details, saved generations, learning history, and
-                subscription or credits information in one organized place. This makes it easier to return to
-                favorite activities, continue past reading sessions, and build a more personalized reading
-                journey over time.
-              </Text>
-            </Box>
-
             <Text fontSize="lg" textAlign="center" lineHeight="tall">
               These four tools work together to make reading more fun and accessible for everyone. Whether you
               learn better by seeing, hearing, or doing, Read On adapts to your unique way of learning. It&apos;s
@@ -418,6 +478,39 @@ export default function HomePage() {
             </Text>
           </VStack>
         </Box>
+
+        {generatingStory && (
+          <Box
+            position="fixed"
+            inset={0}
+            zIndex={2000}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            bg="blackAlpha.500"
+            backdropFilter="blur(6px)"
+          >
+            <VStack
+              spacing={6}
+              px={10}
+              py={12}
+              borderRadius="2xl"
+              bgGradient="linear(to-br, white, blue.50, purple.50)"
+              borderWidth="1px"
+              borderColor="whiteAlpha.800"
+              boxShadow="2xl"
+              minW={{ base: '280px', md: '360px' }}
+            >
+              <Spinner thickness="4px" speed="0.7s" emptyColor="gray.200" color="purple.500" size="xl" />
+              <Text fontSize="2xl" fontWeight="bold" bgGradient="linear(to-r, blue.500, purple.600, pink.500)" bgClip="text">
+                Generating Story...
+              </Text>
+              <Text fontSize="sm" color="gray.600" textAlign="center" maxW="sm">
+                Preparing your learning experiences. This can take a minute.
+              </Text>
+            </VStack>
+          </Box>
+        )}
 
         <AlertDialog isOpen={authDialog.isOpen} leastDestructiveRef={cancelRef} onClose={authDialog.onClose}>
           <AlertDialogOverlay />
