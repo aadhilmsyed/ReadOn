@@ -26,7 +26,12 @@ export async function getCreditBalanceUnified(userId: string): Promise<{ user_id
     try {
       return await getCreditBalance(userId);
     } catch (err) {
+      // Timeouts, connection errors, and 5xx from dashboard-service fall back to the same Postgres ledger
+      // the service uses, so credits stay usable when the HTTP hop is flaky.
       if (err instanceof DashboardServiceError && err.status >= 500) {
+        return getBalanceDirect(userId);
+      }
+      if (!(err instanceof DashboardServiceError)) {
         return getBalanceDirect(userId);
       }
       throw err;
