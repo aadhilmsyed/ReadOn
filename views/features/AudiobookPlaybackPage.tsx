@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import {
   Alert,
@@ -11,6 +12,7 @@ import {
   Box,
   Button,
   Heading,
+  HStack,
   Text,
   VStack,
 } from '@chakra-ui/react';
@@ -23,6 +25,9 @@ function tokenizeSourceText(text: string) {
 }
 
 export function AudiobookPlaybackPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const storyIdParam = (searchParams.get('storyId') ?? '').trim();
   const feature = getFeatureDefinition('audiobook');
   const [sourceText, setSourceText] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -34,9 +39,11 @@ export function AudiobookPlaybackPage() {
   const tokens = useMemo(() => tokenizeSourceText(sourceText), [sourceText]);
 
   useEffect(() => {
+    if (storyIdParam) return undefined;
     const cachedText = sessionStorage.getItem('audiobook:sourceText') ?? '';
     setSourceText(cachedText);
-  }, []);
+    return undefined;
+  }, [storyIdParam]);
 
   useEffect(() => {
     return () => {
@@ -47,8 +54,54 @@ export function AudiobookPlaybackPage() {
   }, [audioUrl]);
 
   useEffect(() => {
+    if (!storyIdParam) return undefined;
+    let cancelled = false;
+    (async () => {
+      setError(null);
+      setLoading(true);
+      try {
+        const [stRes, auRes] = await Promise.all([
+          fetch(`/api/stories/${encodeURIComponent(storyIdParam)}`, { credentials: 'include', cache: 'no-store' }),
+          fetch(`/api/audiobook/story/${encodeURIComponent(storyIdParam)}`, { credentials: 'include', cache: 'no-store' }),
+        ]);
+        if (cancelled) return;
+        if (!stRes.ok || !auRes.ok) {
+          setError('Prepared read-aloud is not available for this story.');
+          setSourceText('');
+          return;
+        }
+        const storyJson = (await stRes.json()) as { sourceText?: string };
+        const auJson = (await auRes.json()) as { mimeType?: string; audioBase64?: string };
+        if (cancelled) return;
+        if (typeof storyJson.sourceText === 'string') {
+          setSourceText(storyJson.sourceText);
+        }
+        const raw = auJson.audioBase64 ?? '';
+        const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: auJson.mimeType || 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        setAudioUrl((prevUrl) => {
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+          return url;
+        });
+        queueMicrotask(() => {
+          void audioRef.current?.play().catch(() => {});
+        });
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load audio.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storyIdParam]);
+
+  useEffect(() => {
+    if (storyIdParam) return undefined;
     if (!sourceText) {
-      return;
+      return undefined;
     }
 
     const generateAudio = async () => {
@@ -90,7 +143,8 @@ export function AudiobookPlaybackPage() {
     };
 
     void generateAudio();
-  }, [sourceText]);
+    return undefined;
+  }, [sourceText, storyIdParam]);
 
   const updateActiveToken = () => {
     const player = audioRef.current;
@@ -107,6 +161,13 @@ export function AudiobookPlaybackPage() {
   return (
     <AppShell>
       <VStack spacing={8} align="stretch" maxW="900px" mx="auto" w="100%">
+        {storyIdParam ? (
+          <HStack>
+            <Button variant="ghost" size="sm" onClick={() => router.push(`/features/${encodeURIComponent(storyIdParam)}`)}>
+              ← Back to story features
+            </Button>
+          </HStack>
+        ) : null}
         <VStack spacing={3} align="stretch" textAlign="center" pt={2}>
           <Heading
             as="h1"
@@ -167,7 +228,7 @@ export function AudiobookPlaybackPage() {
               />
               {loading ? (
                 <Text mt={2} fontSize="sm" color="gray.600">
-                  Generating narration…
+                  {storyIdParam ? 'Loading prepared narration…' : 'Generating narration…'}
                 </Text>
               ) : null}
             </Box>
@@ -196,13 +257,18 @@ export function AudiobookPlaybackPage() {
             ) : null}
 
             <Button
-              as={Link}
-              href="/audiobook"
+              as={storyIdParam ? undefined : Link}
+              href={storyIdParam ? undefined : '/audiobook'}
               variant="outline"
               colorScheme="purple"
               alignSelf="flex-start"
+              onClick={
+                storyIdParam
+                  ? () => router.push(`/features/${encodeURIComponent(storyIdParam)}`)
+                  : undefined
+              }
             >
-              Back to input
+              {storyIdParam ? 'Back to story features' : 'Back to input'}
             </Button>
           </VStack>
           </Box>
