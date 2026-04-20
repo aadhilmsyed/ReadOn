@@ -1,0 +1,975 @@
+openapi: 3.0.3
+info:
+  title: ReadOn Comprehension Service API
+  version: 0.1.0
+  description: >
+    Backend-only API for generating, retrieving, and scoring reading comprehension
+    questions. Browsers must not call this service directly. The main app exposes
+    matching server-side BFF routes under /api/comprehension and forwards to this
+    service using READON_COMPREHENSION_SERVICE_URL.
+servers:
+  - url: http://localhost:8080
+    description: Local comprehension service
+tags:
+  - name: Comprehension
+    description: Question generation, retrieval, and scoring
+  - name: Operations
+    description: Service health, readiness, metadata, and contract endpoints
+paths:
+  /comprehension/questions:
+    post:
+      tags:
+        - Comprehension
+      summary: Generate comprehension questions
+      description: >
+        Generates reading comprehension questions for a source text, persists the
+        result, and returns either LLM-generated questions, cached fallback
+        questions, or default fallback questions. The main app mirrors this as
+        POST /api/comprehension/questions.
+      operationId: generateComprehensionQuestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateQuestionsRequest'
+            examples:
+              basic:
+                value:
+                  sourceText: Alice found a small key on the table and wondered which door it opened.
+                  questionCount: 5
+                  difficulty: medium
+      responses:
+        '200':
+          description: Questions generated or fallback questions returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComprehensionResult'
+              examples:
+                llm:
+                  summary: LLM-generated response
+                  value:
+                    resultId: cmp_01hv7r3k6x9m2v8q4z1p5n0abc
+                    status: completed
+                    sourceTextHash: sha256:3f786850e387550fdab836ed7e6dc881de23001b
+                    questions:
+                      - id: q1
+                        type: multiple_choice
+                        prompt: What is the main idea of the passage?
+                        choices:
+                          - id: A
+                            text: The passage explains a central event or idea.
+                          - id: B
+                            text: The passage lists unrelated facts.
+                          - id: C
+                            text: The passage gives only character names.
+                          - id: D
+                            text: The passage avoids a clear topic.
+                        correctChoiceId: A
+                        explanation: The correct answer matches the central meaning of the passage.
+                    generation:
+                      source: llm
+                      fallbackUsed: false
+                      fallbackReason: null
+                      fallbackMessage: null
+                      cached: false
+                      persisted: true
+                      generatedAt: '2026-04-12T18:30:00.000Z'
+                    circuitBreaker:
+                      state: closed
+                      failureCount: 0
+                      openedAt: null
+                      retryAfterSeconds: null
+                cachedFallback:
+                  summary: Cached fallback after provider failure
+                  value:
+                    resultId: cmp_01hv7r3k6x9m2v8q4z1p5n0abc
+                    status: completed
+                    sourceTextHash: sha256:3f786850e387550fdab836ed7e6dc881de23001b
+                    questions:
+                      - id: q1
+                        type: multiple_choice
+                        prompt: What is the main idea of the passage?
+                        choices:
+                          - id: A
+                            text: The passage explains a central event or idea.
+                          - id: B
+                            text: The passage lists unrelated facts.
+                          - id: C
+                            text: The passage gives only character names.
+                          - id: D
+                            text: The passage avoids a clear topic.
+                        correctChoiceId: A
+                        explanation: The correct answer matches the central meaning of the passage.
+                    generation:
+                      source: cache
+                      fallbackUsed: true
+                      fallbackReason: cache_hit_after_failure
+                      fallbackMessage: Generated questions are temporarily unavailable, so a saved question set was returned.
+                      cached: true
+                      persisted: true
+                      generatedAt: '2026-04-12T18:30:00.000Z'
+                    circuitBreaker:
+                      state: open
+                      failureCount: 3
+                      openedAt: '2026-04-12T18:29:42.000Z'
+                      retryAfterSeconds: 45
+                defaultFallback:
+                  summary: Default fallback when no cached result exists
+                  value:
+                    resultId: cmp_01hv7r3k6x9m2v8q4z1p5n0def
+                    status: completed
+                    sourceTextHash: sha256:3f786850e387550fdab836ed7e6dc881de23001b
+                    questions:
+                      - id: q1
+                        type: multiple_choice
+                        prompt: What is the main idea of the text?
+                        choices:
+                          - id: A
+                            text: The most important point or message.
+                          - id: B
+                            text: A minor detail.
+                          - id: C
+                            text: An unrelated fact.
+                          - id: D
+                            text: A repeated word.
+                        correctChoiceId: A
+                        explanation: The main idea is the central point the text communicates.
+                    generation:
+                      source: default_fallback
+                      fallbackUsed: true
+                      fallbackReason: default_questions
+                      fallbackMessage: Generated questions are temporarily unavailable, so general comprehension questions were returned.
+                      cached: false
+                      persisted: true
+                      generatedAt: '2026-04-12T18:30:00.000Z'
+                    circuitBreaker:
+                      state: open
+                      failureCount: 3
+                      openedAt: '2026-04-12T18:29:42.000Z'
+                      retryAfterSeconds: 45
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comprehension/questions/{resultId}:
+    get:
+      tags:
+        - Comprehension
+      summary: Get a persisted comprehension result
+      description: >
+        Retrieves a previously generated question set. The main app mirrors this
+        as GET /api/comprehension/questions/{resultId}.
+      operationId: getComprehensionResult
+      parameters:
+        - $ref: '#/components/parameters/ResultId'
+      responses:
+        '200':
+          description: Persisted comprehension result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComprehensionResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comprehension/questions/{resultId}/answers:
+    post:
+      tags:
+        - Comprehension
+      summary: Score selected answers
+      description: >
+        Scores selected answers against a persisted question set and persists the
+        submission. The main app mirrors this as
+        POST /api/comprehension/questions/{resultId}/answers. The frontend may
+        also provide immediate client-side feedback from correctChoiceId in the
+        question payload, but this endpoint is the backend-backed scoring and
+        history contract.
+      operationId: scoreComprehensionAnswers
+      parameters:
+        - $ref: '#/components/parameters/ResultId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAnswersRequest'
+            examples:
+              basic:
+                value:
+                  answers:
+                    - questionId: q1
+                      selectedChoiceId: A
+                    - questionId: q2
+                      selectedChoiceId: C
+      responses:
+        '200':
+          description: Answers scored and persisted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerSubmission'
+              examples:
+                scored:
+                  value:
+                    resultId: cmp_01hv7r3k6x9m2v8q4z1p5n0abc
+                    submissionId: sub_01hv7r5m4q8b7n2x9z0p1c3def
+                    status: scored
+                    score:
+                      correct: 1
+                      total: 2
+                      percentage: 50
+                    answers:
+                      - questionId: q1
+                        selectedChoiceId: A
+                        correctChoiceId: A
+                        isCorrect: true
+                        explanation: The correct answer matches the central meaning of the passage.
+                      - questionId: q2
+                        selectedChoiceId: C
+                        correctChoiceId: B
+                        isCorrect: false
+                        explanation: The passage supports choice B more directly.
+                    persisted: true
+                    scoredAt: '2026-04-12T18:35:00.000Z'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /comprehension/history:
+    get:
+      tags:
+        - Comprehension
+      summary: Get prior comprehension attempts for a user
+      description: >
+        Retrieves recent answer attempts for the user identified by
+        x-readon-user-id or the userId query parameter. The main app mirrors this
+        as GET /api/comprehension/history and forwards user context server-side.
+      operationId: getComprehensionHistory
+      parameters:
+        - name: x-readon-user-id
+          in: header
+          required: false
+          schema:
+            type: string
+          description: User identifier supplied by the main app when available.
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Fallback user identifier for server-side callers.
+      responses:
+        '200':
+          description: Recent comprehension attempts for the user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComprehensionHistory'
+              examples:
+                history:
+                  value:
+                    userId: learner@example.com
+                    attempts:
+                      - submissionId: sub_01hv7r5m4q8b7n2x9z0p1c3def
+                        resultId: cmp_01hv7r3k6x9m2v8q4z1p5n0abc
+                        storyId: story_123
+                        title: Alice found a small key
+                        submittedAt: '2026-04-12T18:35:00.000Z'
+                        score:
+                          correct: 1
+                          total: 2
+                          percentage: 50
+                        answers:
+                          - questionId: q1
+                            selectedChoiceId: A
+                            correctChoiceId: A
+                            isCorrect: true
+                            explanation: The correct answer matches the central meaning of the passage.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /health:
+    get:
+      tags:
+        - Operations
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: comprehension-service
+                    version: unknown
+                    now: '2026-04-12T18:30:00.000Z'
+  /live:
+    get:
+      tags:
+        - Operations
+      summary: Liveness check
+      operationId: getLive
+      responses:
+        '200':
+          description: Service process is live.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveResponse'
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    path: /live
+                    service: comprehension-service
+                    version: unknown
+                    now: '2026-04-12T18:30:00.000Z'
+  /ready:
+    get:
+      tags:
+        - Operations
+      summary: Readiness check
+      operationId: getReady
+      responses:
+        '200':
+          description: Service is ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+              examples:
+                ready:
+                  value:
+                    status: ready
+                    service: comprehension-service
+                    version: unknown
+                    dbMountCheck: disabled
+                    dbMountConnectionNameConfigured: true
+                    now: '2026-04-12T18:30:00.000Z'
+        '503':
+          description: Service is not ready.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotReadyResponse'
+  /meta:
+    get:
+      tags:
+        - Operations
+      summary: Service metadata
+      operationId: getMeta
+      responses:
+        '200':
+          description: Service metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetaResponse'
+              examples:
+                meta:
+                  value:
+                    service: comprehension-service
+                    version: unknown
+                    environment: production
+                    now: '2026-04-12T18:30:00.000Z'
+  /swagger:
+    get:
+      tags:
+        - Operations
+      summary: Swagger UI
+      operationId: getSwaggerContract
+      responses:
+        '200':
+          description: Browser UI for the Swagger/OpenAPI contract.
+          content:
+            text/html:
+              schema:
+                type: string
+  /swagger/comprehensionservice.yaml:
+    get:
+      tags:
+        - Operations
+      summary: Swagger contract source
+      operationId: getSwaggerContractSource
+      responses:
+        '200':
+          description: Swagger/OpenAPI YAML contract for the comprehension service.
+          content:
+            application/yaml:
+              schema:
+                type: string
+components:
+  parameters:
+    ResultId:
+      name: resultId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      example: cmp_01hv7r3k6x9m2v8q4z1p5n0abc
+  responses:
+    ValidationError:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            sourceTextRequired:
+              value:
+                error:
+                  code: validation_error
+                  message: sourceText is required.
+                  requestId: req_01hv7r3k6x9m2v8q4z1p5n0xyz
+                  retryable: false
+                  details:
+                    - field: sourceText
+                      issue: required
+                  circuitBreaker:
+                    state: closed
+                    failureCount: 0
+                    openedAt: null
+                    retryAfterSeconds: null
+    NotFound:
+      description: Comprehension result was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                error:
+                  code: not_found
+                  message: Comprehension result was not found.
+                  requestId: req_01hv7r3k6x9m2v8q4z1p5n0xyz
+                  retryable: false
+                  details: []
+    MethodNotAllowed:
+      description: Unsupported HTTP method.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            methodNotAllowed:
+              value:
+                error:
+                  code: method_not_allowed
+                  message: Method not allowed.
+                  requestId: req_01hv7r3k6x9m2v8q4z1p5n0xyz
+                  retryable: false
+                  details: []
+    InternalError:
+      description: Unexpected server or persistence error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internal:
+              value:
+                error:
+                  code: internal_error
+                  message: An unexpected error occurred.
+                  requestId: req_01hv7r3k6x9m2v8q4z1p5n0xyz
+                  retryable: true
+                  details: []
+  schemas:
+    GenerateQuestionsRequest:
+      type: object
+      required:
+        - sourceText
+      additionalProperties: false
+      properties:
+        sourceText:
+          type: string
+          minLength: 1
+          maxLength: 3500
+          description: Reading text used to generate comprehension questions.
+        questionCount:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        difficulty:
+          type: string
+          enum:
+            - easy
+            - medium
+            - hard
+          default: medium
+    ComprehensionResult:
+      type: object
+      required:
+        - resultId
+        - status
+        - sourceTextHash
+        - questions
+        - generation
+        - circuitBreaker
+      additionalProperties: false
+      properties:
+        resultId:
+          type: string
+          description: Stable persisted result identifier.
+        status:
+          type: string
+          enum:
+            - completed
+        sourceTextHash:
+          type: string
+          description: Hash of normalized source text used for cache lookup.
+          example: sha256:3f786850e387550fdab836ed7e6dc881de23001b
+        questions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Question'
+        generation:
+          $ref: '#/components/schemas/GenerationMetadata'
+        circuitBreaker:
+          $ref: '#/components/schemas/CircuitBreakerState'
+    Question:
+      type: object
+      required:
+        - id
+        - type
+        - prompt
+        - choices
+        - correctChoiceId
+        - explanation
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          example: q1
+        type:
+          type: string
+          enum:
+            - multiple_choice
+        prompt:
+          type: string
+          minLength: 1
+        choices:
+          type: array
+          minItems: 2
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/Choice'
+        correctChoiceId:
+          $ref: '#/components/schemas/ChoiceId'
+        explanation:
+          type: string
+          minLength: 1
+    Choice:
+      type: object
+      required:
+        - id
+        - text
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/ChoiceId'
+        text:
+          type: string
+          minLength: 1
+    ChoiceId:
+      type: string
+      enum:
+        - A
+        - B
+        - C
+        - D
+    GenerationMetadata:
+      type: object
+      required:
+        - source
+        - fallbackUsed
+        - fallbackReason
+        - fallbackMessage
+        - cached
+        - persisted
+        - generatedAt
+      additionalProperties: false
+      properties:
+        source:
+          type: string
+          enum:
+            - llm
+            - cache
+            - default_fallback
+        fallbackUsed:
+          type: boolean
+        fallbackReason:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FallbackReason'
+        fallbackMessage:
+          type: string
+          nullable: true
+        cached:
+          type: boolean
+        persisted:
+          type: boolean
+        generatedAt:
+          type: string
+          format: date-time
+    FallbackReason:
+      type: string
+      enum:
+        - llm_error
+        - llm_timeout
+        - invalid_llm_response
+        - circuit_open
+        - cache_hit_after_failure
+        - default_questions
+    CircuitBreakerState:
+      type: object
+      required:
+        - state
+        - failureCount
+        - openedAt
+        - retryAfterSeconds
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+          enum:
+            - closed
+            - open
+            - half_open
+        failureCount:
+          type: integer
+          minimum: 0
+        openedAt:
+          type: string
+          format: date-time
+          nullable: true
+        retryAfterSeconds:
+          type: integer
+          minimum: 0
+          nullable: true
+    SubmitAnswersRequest:
+      type: object
+      required:
+        - answers
+      additionalProperties: false
+      properties:
+        answers:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/SubmittedAnswer'
+    SubmittedAnswer:
+      type: object
+      required:
+        - questionId
+        - selectedChoiceId
+      additionalProperties: false
+      properties:
+        questionId:
+          type: string
+          minLength: 1
+          example: q1
+        selectedChoiceId:
+          $ref: '#/components/schemas/ChoiceId'
+    AnswerSubmission:
+      type: object
+      required:
+        - resultId
+        - submissionId
+        - status
+        - score
+        - answers
+        - persisted
+        - scoredAt
+      additionalProperties: false
+      properties:
+        resultId:
+          type: string
+        submissionId:
+          type: string
+        status:
+          type: string
+          enum:
+            - scored
+        score:
+          $ref: '#/components/schemas/Score'
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScoredAnswer'
+        persisted:
+          type: boolean
+        scoredAt:
+          type: string
+          format: date-time
+    ComprehensionHistory:
+      type: object
+      required:
+        - userId
+        - attempts
+      additionalProperties: false
+      properties:
+        userId:
+          type: string
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryAttempt'
+    HistoryAttempt:
+      type: object
+      required:
+        - submissionId
+        - resultId
+        - storyId
+        - title
+        - submittedAt
+        - score
+        - answers
+      additionalProperties: false
+      properties:
+        submissionId:
+          type: string
+        resultId:
+          type: string
+        storyId:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+        score:
+          $ref: '#/components/schemas/Score'
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScoredAnswer'
+    Score:
+      type: object
+      required:
+        - correct
+        - total
+        - percentage
+      additionalProperties: false
+      properties:
+        correct:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 1
+        percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+    ScoredAnswer:
+      type: object
+      required:
+        - questionId
+        - selectedChoiceId
+        - correctChoiceId
+        - isCorrect
+        - explanation
+      additionalProperties: false
+      properties:
+        questionId:
+          type: string
+        selectedChoiceId:
+          $ref: '#/components/schemas/ChoiceId'
+        correctChoiceId:
+          $ref: '#/components/schemas/ChoiceId'
+        isCorrect:
+          type: boolean
+        explanation:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      additionalProperties: false
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+        - requestId
+        - retryable
+        - details
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum:
+            - validation_error
+            - not_found
+            - method_not_allowed
+            - service_url_not_configured
+            - microservice_unavailable
+            - persistence_error
+            - internal_error
+        message:
+          type: string
+        requestId:
+          type: string
+        retryable:
+          type: boolean
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        circuitBreaker:
+          $ref: '#/components/schemas/CircuitBreakerState'
+    ErrorDetail:
+      type: object
+      required:
+        - field
+        - issue
+      additionalProperties: false
+      properties:
+        field:
+          type: string
+        issue:
+          type: string
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - service
+        - version
+        - now
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        service:
+          type: string
+        version:
+          type: string
+        now:
+          type: string
+          format: date-time
+    LiveResponse:
+      type: object
+      required:
+        - status
+        - path
+        - service
+        - version
+        - now
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        path:
+          type: string
+          enum:
+            - /live
+        service:
+          type: string
+        version:
+          type: string
+        now:
+          type: string
+          format: date-time
+    ReadyResponse:
+      type: object
+      required:
+        - status
+        - service
+        - version
+        - dbMountCheck
+        - dbMountConnectionNameConfigured
+        - now
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+        service:
+          type: string
+        version:
+          type: string
+        dbMountCheck:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        dbMountConnectionNameConfigured:
+          type: boolean
+        now:
+          type: string
+          format: date-time
+    NotReadyResponse:
+      type: object
+      required:
+        - status
+        - service
+        - version
+        - missing
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - not-ready
+        service:
+          type: string
+        version:
+          type: string
+        missing:
+          type: string
+          enum:
+            - cloudsql_mount
+        mountPath:
+          type: string
+    MetaResponse:
+      type: object
+      required:
+        - service
+        - version
+        - environment
+        - now
+      additionalProperties: false
+      properties:
+        service:
+          type: string
+        version:
+          type: string
+        environment:
+          type: string
+        now:
+          type: string
+          format: date-time

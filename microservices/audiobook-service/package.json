@@ -1,0 +1,22 @@
+{
+  "name": "audiobook-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ReadOn audiobook / Google TTS microservice",
+  "main": "server.ts",
+  "scripts": {
+    "dev": "tsx watch server.ts",
+    "start": "tsx server.ts"
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^6.4.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

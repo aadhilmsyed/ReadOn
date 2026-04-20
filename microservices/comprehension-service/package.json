@@ -1,0 +1,14 @@
+{
+  "name": "comprehension-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ReadOn comprehension microservice",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "NODE_ENV=production node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

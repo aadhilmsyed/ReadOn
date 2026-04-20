@@ -26,9 +26,7 @@ export class LocalStorageSessionStrategy implements SessionStrategy {
 
   createSession(user: SessionUser): SessionRecord {
     const session: SessionRecord = {
-      token: `mock-session-${Date.now()}`,
       user,
-      issuedAt: new Date().toISOString(),
     };
 
     if (typeof window !== 'undefined') {

@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -25,9 +25,14 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# local env files (all paths; do not commit secrets)
 .env*.local
 .env
+**/.env
+
+# GCP credentials (local)
+/credentials/google-application-credentials.json
+microservices/audiobook-service/google-tts-service-account.json
 
 # vercel
 .vercel

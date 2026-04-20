@@ -36,7 +36,8 @@ The application currently runs as a static Next.js and Chakra UI experience with
 │   ├── audiobook-service/
 │   ├── comprehension-service/
 │   ├── phonics-service/
-│   └── visualization-service/
+│   ├── image-generation-service/
+│   └── dashboard-service/
 ├── orchestrators/
 │   ├── auth/
 │   ├── dashboard/
@@ -58,6 +59,12 @@ The application currently runs as a static Next.js and Chakra UI experience with
     └── providers/
 ```
 
+## Architectural Style
+
+ReadOn follows a **Microservices + Orchestrator (Backend-for-Frontend)** architecture, layered over a Next.js UI and deployed on Google Cloud Run. The top-level directories (`views/`, `orchestrators/`, `microservices/`, `shared/`, `ops/gcp/`) directly reflect this style — each microservice is independently deployable with its own Dockerfile and MVC structure, the orchestrator layer is the single seam through which the UI composes service calls, and infrastructure-as-code is kept separate from application code.
+
+See [docs/architecture.md](docs/architecture.md) for the full architectural style write-up, dependency direction, and rationale.
+
 ## Architectural Separation
 
 ### `views/`
@@ -72,14 +79,42 @@ Contains feature-specific service skeletons organized as lightweight MVC-style s
 ### `shared/`
 Contains reusable interfaces, mock content, session abstractions, and common helpers such as the shared `notImplemented()` placeholder used by backend-oriented skeleton code.
 
-## Running the App
+## Running the App (local dev)
+
+The **Next.js app** (orchestrator / BFF) and each **microservice** are separate processes. Configure the repo root `.env` with microservice base URLs (see `.env.example`), and put secrets and DB URLs in each service’s own `.env` under `microservices/<name>/.env`.
+
+**Fixed local ports**
+
+| Process | Port |
+| --- | --- |
+| Main Next.js app | 3000 |
+| phonics-service | 3001 |
+| comprehension-service | 3002 |
+| image-generation-service | 3003 |
+| audiobook-service | 3004 |
+| dashboard-service | 3005 |
+
+**Typical startup (one terminal per service)**
 
 ```bash
 npm install
-npm run dev
+# optional: npm install in each microservices/*/ that has its own package.json
+
+npm run dev                              # main app → http://127.0.0.1:3000
+npm run dev:phonics                      # http://127.0.0.1:3001
+npm run dev:comprehension                # http://127.0.0.1:3002
+npm run dev:image-generation             # http://127.0.0.1:3003
+npm run dev:audiobook                    # http://127.0.0.1:3004
+npm run dev:dashboard                    # http://127.0.0.1:3005
 ```
 
-The app runs from the repository root using Next.js.
+**Optional:** `npm run dev:all` runs the main app plus all of the above via `concurrently` (local only).
+
+**Health checks:** each microservice exposes `GET /health` (and usually `/live`, `/ready`, `/meta` where applicable). With nothing bound on 3001–3005, run `npm run verify:services` to spawn each service briefly and `curl` its `/health`.
+
+**Deeper checks:** `npm run verify:endpoints` exercises `/health`, `/live`, `/ready`, `/meta`, and one representative feature route per microservice (ports 3001–3005). **Comprehension local DB:** set `DATABASE_URL` in `microservices/comprehension-service/.env`; it takes precedence over `READON_DATABASE_NAME` + Cloud SQL socket (see that service’s `.env.example`).
+
+**Cloud Run:** containers listen on `PORT` (typically **8080** from the platform). URLs between services are set at deploy time, not via localhost.
 
 ## Frontend Behavior
 
@@ -106,16 +141,13 @@ Each microservice directory is intentionally implementation-pending. Route handl
 
 This keeps the codebase ready for teammates to add real APIs, storage, data models, and service coordination without inheriting previous implementation constraints.
 
-## Future Infrastructure Direction
+## Google Cloud Deployment (Skeleton Infra)
 
-This refactor does not add deployment or infrastructure files yet, but the codebase is being organized to support a future Google Cloud deployment path.
+This repository includes infrastructure wiring (containerization, Cloud Run deployment scaffolding, health endpoints, and operational config plumbing) while keeping all feature/business logic intentionally stubbed.
 
-Expected future directions include:
+- **Ops scripts:** `ops/gcp/README.md` — provision, prod/test deploy, verify.
+- **Dual environment:** same project; `dev` branch → test Cloud Run services, `main` → prod ([docs/environment-separation.md](docs/environment-separation.md)).
+- **CI/CD:** GitHub Actions + Workload Identity Federation ([docs/cicd-overview.md](docs/cicd-overview.md)).
+- **Config template:** `.env.example`
 
-- application deployment on Google Cloud
-- managed relational storage such as Cloud SQL
-- object storage for generated assets and media
-- Redis-compatible caching for orchestration and session workloads
-- test and production deployment automation
-
-The current separation between views, orchestrators, microservices, and shared interfaces is intended to make those future GCP integrations straightforward.
+Planned or partial future pieces (not fully productized here) include Redis/Memorystore and richer service auth beyond the skeleton.

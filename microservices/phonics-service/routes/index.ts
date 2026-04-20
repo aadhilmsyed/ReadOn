@@ -1,5 +1,4 @@
-import { handlePhonicsRequest } from '../controllers/phonicsController';
-
-export async function phonicsRoutes() {
-  return handlePhonicsRequest();
-}
+/**
+ * Legacy scaffold export — prefer `routes/handlers` for orchestrators.
+ */
+export { handleGetStoryPhonics, handlePostProcessPhonics } from './handlers';
