@@ -7,10 +7,16 @@
  */
 import { config as loadEnv } from 'dotenv';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 
+import { pathToInitMigrationSql } from '../utils/phonicsPaths';
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const serviceRoot = join(scriptDir, '..');
 const repoRoot = process.cwd();
+loadEnv({ path: resolve(serviceRoot, '.env') });
 loadEnv({ path: resolve(repoRoot, '.env') });
 loadEnv({ path: resolve(repoRoot, '.env.local'), override: true });
 
@@ -41,8 +47,7 @@ function logSafeUrlDiagnostics(connectionString: string): void {
 }
 
 function loadSql(): string {
-  const p = join(process.cwd(), 'microservices/phonics-service/db/migrations/001_init_phonics.sql');
-  return readFileSync(p, 'utf-8');
+  return readFileSync(pathToInitMigrationSql(), 'utf-8');
 }
 
 function buildPool(): Pool {

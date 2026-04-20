@@ -6,10 +6,16 @@
  */
 import { config as loadEnv } from 'dotenv';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 
+import { pathToInitMigrationSql, pathToResetMigrationSql } from '../utils/phonicsPaths';
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const serviceRoot = join(scriptDir, '..');
 const repoRoot = process.cwd();
+loadEnv({ path: resolve(serviceRoot, '.env') });
 loadEnv({ path: resolve(repoRoot, '.env') });
 loadEnv({ path: resolve(repoRoot, '.env.local'), override: true });
 
@@ -57,14 +63,8 @@ async function main(): Promise<void> {
       `[phonics reset] Row counts before: Story_Phonics_Words=${storyLinksBefore}, Phonics_Words=${wordsBefore}`,
     );
 
-    const resetSql = readFileSync(
-      join(repoRoot, 'microservices/phonics-service/db/migrations/000_reset_phonics.sql'),
-      'utf-8',
-    );
-    const initSql = readFileSync(
-      join(repoRoot, 'microservices/phonics-service/db/migrations/001_init_phonics.sql'),
-      'utf-8',
-    );
+    const resetSql = readFileSync(pathToResetMigrationSql(), 'utf-8');
+    const initSql = readFileSync(pathToInitMigrationSql(), 'utf-8');
     await pool.query(resetSql);
     await pool.query(initSql);
     // eslint-disable-next-line no-console

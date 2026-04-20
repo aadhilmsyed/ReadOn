@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import type { PhonicsFlashcardDto, PhonicsWordRow, ResolvedPhonicsEntry } from '@phonics/types';
 import { getPhonicsPool } from '@phonics/models/db';
+import { pathToInitMigrationSql } from '@phonics/utils/phonicsPaths';
 
 let schemaReady = false;
 
 export function loadInitMigrationSql(): string {
-  const path = join(process.cwd(), 'microservices/phonics-service/db/migrations/001_init_phonics.sql');
-  return readFileSync(path, 'utf-8');
+  return readFileSync(pathToInitMigrationSql(), 'utf-8');
 }
 
 /**
