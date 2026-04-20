@@ -42,7 +42,6 @@
     "node_modules",
     "microservices/audiobook-service",
     "microservices/comprehension-service",
-    "microservices/visualization-service",
     "microservices/image-generation-service",
     "microservices/dashboard-service",
     "microservices/common"
