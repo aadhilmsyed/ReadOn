@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "install:all": "npm install && npm --prefix microservices/phonics-service install && npm --prefix microservices/comprehension-service install && npm --prefix microservices/image-generation-service install && npm --prefix microservices/audiobook-service install && npm --prefix microservices/dashboard-service install",
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
