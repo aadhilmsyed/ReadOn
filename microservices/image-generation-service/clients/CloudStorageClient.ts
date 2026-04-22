@@ -14,11 +14,22 @@ export class CloudStorageClient {
   private logger: Logger;
 
   constructor() {
-    this.storage = new Storage({
-      projectId: process.env.GCP_PROJECT_ID,
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    });
-    this.bucketName = process.env.READON_STORAGE_BUCKET || 'readon-assets';
+    // On Cloud Run, credentials are automatically provided via the service account
+    // Locally, use GOOGLE_APPLICATION_CREDENTIALS file if provided
+    const storageOptions: { projectId?: string; keyFilename?: string } = {};
+    
+    if (process.env.GCP_PROJECT_ID) {
+      storageOptions.projectId = process.env.GCP_PROJECT_ID;
+    }
+    
+    // Only use keyFilename if explicitly provided (local development)
+    // On Cloud Run, omit this to use the attached service account
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      storageOptions.keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    }
+    
+    this.storage = new Storage(storageOptions);
+    this.bucketName = process.env.READON_STORAGE_BUCKET || 'readon-492106-assets';
     this.logger = new Logger('CloudStorageClient');
   }
 
