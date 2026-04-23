@@ -50,7 +50,7 @@ function readBool(name: string, fallback: boolean): boolean {
 }
 
 function readStorageDriver(): StorageDriver {
-  const raw = process.env.STORAGE_DRIVER || 'postgres';
+  const raw = process.env.STORAGE_DRIVER;
 
   if (raw !== 'postgres' && raw !== 'memory') {
     throw new Error('STORAGE_DRIVER must be either "postgres" or "memory"');
