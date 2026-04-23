@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 
 import { handleAudiobookRequest } from './controllers/audiobookController';
+import { consumeRecentNarrationCacheStatus } from './services/audiobookService';
 
 dotenv.config();
 
@@ -54,8 +55,10 @@ app.get('/meta', (_req, res) => {
 app.post('/tts', async (req, res) => {
   try {
     const result = await handleAudiobookRequest(req.body);
+    const cacheStatus = consumeRecentNarrationCacheStatus(result.sourceText);
     res.setHeader('Content-Type', result.mimeType);
     res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('TTS-Cache', cacheStatus);
     res.status(200).send(result.audioBuffer);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Read-aloud failed.';
