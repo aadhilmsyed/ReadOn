@@ -90,3 +90,34 @@ test('half-open failure reopens breaker', async () => {
   assert.equal(snapshot.failureCount, 1);
   assert.equal(snapshot.retryAfterSeconds, 1);
 });
+
+test('half-open allows only one probe request at a time', async () => {
+  let now = 0;
+  const breaker = new CircuitBreaker({
+    failureThreshold: 1,
+    resetTimeoutMs: 1000,
+    now: () => now,
+  });
+
+  await assert.rejects(() => breaker.execute(failingOperation()));
+  now = 1000;
+
+  let releaseProbe;
+  const probe = breaker.execute(
+    () => new Promise((resolve) => {
+      releaseProbe = resolve;
+    }),
+  );
+
+  await assert.rejects(
+    () => breaker.execute(async () => 'should not run'),
+    {
+      code: 'CIRCUIT_OPEN',
+    },
+  );
+
+  releaseProbe('ok');
+  const result = await probe;
+  assert.equal(result, 'ok');
+  assert.equal(breaker.snapshot().state, 'closed');
+});
