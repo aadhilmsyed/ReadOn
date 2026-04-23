@@ -13,6 +13,7 @@ services=(
   "${COMPREHENSION_RUN_SERVICE_NAME}"
   "${VISUALIZATION_RUN_SERVICE_NAME}"
   "${AUDIOBOOK_RUN_SERVICE_NAME}"
+  "${DASHBOARD_RUN_SERVICE_NAME}"
 )
 
 probe_paths=(
@@ -57,11 +58,15 @@ for svc in "${services[@]}"; do
       fi
     done
   else
-    echo "Microservice: unauthenticated probes should return 401/403 (authenticated-only model)."
+    echo "Microservice unauthenticated probes: accept 200 (public) or 401/403 (invoker-only)."
     for p in "${probe_paths[@]}"; do
       full="${url}${p}"
       http_code="$(curl -sS -o /dev/null -w '%{http_code}' "${full}" || true)"
       echo "GET ${full} -> ${http_code}"
+      if [[ "${http_code}" != "200" && "${http_code}" != "401" && "${http_code}" != "403" ]]; then
+        echo "ERROR: expected one of 200/401/403 for microservice unauth probe on ${p}" >&2
+        exit 1
+      fi
     done
     if [[ "${VERIFY_AUTHENTICATED}" == "true" ]]; then
       for p in "${probe_paths[@]}"; do

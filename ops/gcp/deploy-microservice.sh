@@ -21,6 +21,13 @@ CLOUDSQL_CONNECTION_NAME="${CLOUDSQL_CONNECTION_NAME:-${GCP_PROJECT_ID}:${REGION
 IMAGE_URI="${IMAGE_URI:-${ARTIFACT_REGISTRY_LOCATION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${run_service_name}:${SERVICE_VERSION}}"
 
 DOCKERFILE_PATH="${DOCKERFILE_PATH:-microservices/${microservice_folder}/Dockerfile}"
+EXTRA_ENV_VARS="${EXTRA_ENV_VARS:-}"
+READON_MICROSERVICES_PUBLIC="${READON_MICROSERVICES_PUBLIC:-true}"
+
+ENV_VARS="SERVICE_NAME=${microservice_folder}##SERVICE_VERSION=${SERVICE_VERSION}##READON_LOG_LEVEL=${READON_LOG_LEVEL:-info}##READON_DEPLOY_ENV=${READON_DEPLOY_ENV}##CLOUDSQL_CONNECTION_NAME=${CLOUDSQL_CONNECTION_NAME}##READON_READY_REQUIRE_CLOUDSQL_MOUNT=${READON_USE_CLOUDSQL_MOUNT}##READON_STORAGE_BUCKET=${READON_STORAGE_BUCKET}##READON_DATABASE_NAME=${READON_DATABASE_NAME}"
+if [[ -n "${EXTRA_ENV_VARS}" ]]; then
+  ENV_VARS="${ENV_VARS}##${EXTRA_ENV_VARS}"
+fi
 
 echo "==> Deploy microservice"
 echo "    GCP_PROJECT_ID=${GCP_PROJECT_ID} REGION=${REGION} READON_DEPLOY_ENV=${READON_DEPLOY_ENV}"
@@ -46,18 +53,26 @@ gcloud beta run deploy "${run_service_name}" \
   --liveness-probe=httpGet.path=/health,httpGet.port=8080 \
   --readiness-probe=httpGet.path=/ready,httpGet.port=8080 \
   --startup-probe=httpGet.path=/live,httpGet.port=8080 \
-  --set-env-vars="SERVICE_NAME=${microservice_folder},SERVICE_VERSION=${SERVICE_VERSION},READON_LOG_LEVEL=${READON_LOG_LEVEL:-info},READON_DEPLOY_ENV=${READON_DEPLOY_ENV},CLOUDSQL_CONNECTION_NAME=${CLOUDSQL_CONNECTION_NAME},READON_READY_REQUIRE_CLOUDSQL_MOUNT=${READON_USE_CLOUDSQL_MOUNT},READON_STORAGE_BUCKET=${READON_STORAGE_BUCKET},READON_DATABASE_NAME=${READON_DATABASE_NAME}" \
+  --set-env-vars="^##^${ENV_VARS}" \
   --labels="app=readon,component=${run_service_name},managed-by=ops-gcp,readon-env=${READON_DEPLOY_ENV}" \
   --quiet
 
-# Harden access model: revoke public invoker access and allow the main app
-# service account to invoke this microservice (for future orchestrator calls).
-gcloud run services remove-iam-policy-binding "${run_service_name}" \
-  --region="${REGION}" \
-  --project="${GCP_PROJECT_ID}" \
-  --member="allUsers" \
-  --role="roles/run.invoker" \
-  --quiet || true
+if [[ "${READON_MICROSERVICES_PUBLIC}" == "true" ]]; then
+  gcloud run services add-iam-policy-binding "${run_service_name}" \
+    --region="${REGION}" \
+    --project="${GCP_PROJECT_ID}" \
+    --member="allUsers" \
+    --role="roles/run.invoker" \
+    --quiet
+else
+  # Harden access model: revoke public invoker access and allow the main app.
+  gcloud run services remove-iam-policy-binding "${run_service_name}" \
+    --region="${REGION}" \
+    --project="${GCP_PROJECT_ID}" \
+    --member="allUsers" \
+    --role="roles/run.invoker" \
+    --quiet || true
+fi
 
 gcloud run services add-iam-policy-binding "${run_service_name}" \
   --region="${REGION}" \

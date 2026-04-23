@@ -152,11 +152,99 @@ function isReadyAtIndex(index: number, value: unknown): boolean {
   return false;
 }
 
+function nowMs(): number {
+  return Date.now();
+}
+
+function logInfo(message: string, extra: Record<string, unknown>): void {
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify({ level: 'INFO', message, ...extra, now: new Date().toISOString() }));
+}
+
+function logWarn(message: string, extra: Record<string, unknown>): void {
+  // eslint-disable-next-line no-console
+  console.warn(JSON.stringify({ level: 'WARN', message, ...extra, now: new Date().toISOString() }));
+}
+
+async function warmPhonicsRead(storyId: string): Promise<void> {
+  const base = phonicsServiceBase();
+  const timeoutMs = Number(process.env.READON_PHONICS_WARM_FETCH_TIMEOUT_MS ?? 30000);
+  const res = await fetch(`${base}/story/${encodeURIComponent(storyId)}`, {
+    method: 'GET',
+    headers: { accept: 'application/json' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(Number.isFinite(timeoutMs) ? timeoutMs : 30000),
+  });
+  if (!res.ok) {
+    throw new Error(`phonics_warm_failed:${res.status}`);
+  }
+}
+
+async function warmComprehensionRead(resultId: string): Promise<void> {
+  const base = comprehensionServiceBase();
+  const timeoutMs = Number(process.env.READON_COMPREHENSION_WARM_FETCH_TIMEOUT_MS ?? 30000);
+  const res = await fetch(`${base}/comprehension/questions/${encodeURIComponent(resultId)}`, {
+    method: 'GET',
+    headers: { accept: 'application/json' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(Number.isFinite(timeoutMs) ? timeoutMs : 30000),
+  });
+  if (!res.ok) {
+    throw new Error(`comprehension_warm_failed:${res.status}`);
+  }
+}
+
+async function warmVisualizationRead(storyId: string): Promise<void> {
+  const base = imageGenerationServiceBase();
+  const timeoutMs = Number(process.env.READON_IMAGE_GEN_WARM_FETCH_TIMEOUT_MS ?? 30000);
+  const res = await fetch(`${base}/images/story/${encodeURIComponent(storyId)}`, {
+    method: 'GET',
+    headers: { accept: 'application/json' },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(Number.isFinite(timeoutMs) ? timeoutMs : 30000),
+  });
+  if (!res.ok) {
+    throw new Error(`visualization_warm_failed:${res.status}`);
+  }
+}
+
+async function warmFeatureReadPaths(args: {
+  storyId: string;
+  features: Record<FeatureKey, ReaderStoryFeatureStatus>;
+  comprehensionResultId?: string;
+}): Promise<void> {
+  const warmTasks: Promise<void>[] = [];
+  if (args.features.phonics === 'ready') {
+    warmTasks.push(warmPhonicsRead(args.storyId));
+  }
+  if (args.features.comprehension === 'ready' && args.comprehensionResultId) {
+    warmTasks.push(warmComprehensionRead(args.comprehensionResultId));
+  }
+  if (args.features.visualization === 'ready') {
+    warmTasks.push(warmVisualizationRead(args.storyId));
+  }
+  // Audiobook player reads from dashboard storage directly (already patched in this flow),
+  // so no extra microservice warm call is needed here.
+  if (warmTasks.length === 0) {
+    return;
+  }
+  const settled = await Promise.allSettled(warmTasks);
+  const failures = settled.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+  if (failures.length > 0) {
+    throw new Error(
+      failures
+        .map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)))
+        .join(','),
+    );
+  }
+}
+
 /**
  * Creates the reader story row, prepares all four features in parallel, persists per-feature status,
  * stores comprehension result id + audiobook audio for later retrieval, then charges 5 credits per successful feature only.
  */
 export async function generateStoryForUser(input: GenerateStoryInput): Promise<GenerateStoryResult> {
+  const startedAt = nowMs();
   const costEach = featureCreditCost();
   const maxCharge = costEach * FEATURE_ORDER.length;
   const { balance } = await getCreditBalanceUnified(input.userId);
@@ -232,6 +320,38 @@ export async function generateStoryForUser(input: GenerateStoryInput): Promise<G
     comprehension_status: features.comprehension,
     visualization_status: features.visualization,
     audiobook_status: features.audiobook,
+  });
+
+  // Warm retrieval paths before redirecting the user to features so first clicks
+  // don't pay cold-start/read-path penalties.
+  const warmStartedAt = nowMs();
+  try {
+    await warmFeatureReadPaths({
+      storyId,
+      features,
+      comprehensionResultId: compVal?.resultId,
+    });
+    logInfo('storygen_feature_read_warm_complete', {
+      storyId,
+      userId: input.userId,
+      duration_ms: nowMs() - warmStartedAt,
+      features,
+    });
+  } catch (e) {
+    logWarn('storygen_feature_read_warm_failed', {
+      storyId,
+      userId: input.userId,
+      duration_ms: nowMs() - warmStartedAt,
+      reason: e instanceof Error ? e.message : String(e),
+      features,
+    });
+  }
+
+  logInfo('storygen_complete', {
+    storyId,
+    userId: input.userId,
+    duration_ms: nowMs() - startedAt,
+    features,
   });
 
   return { storyId, features };

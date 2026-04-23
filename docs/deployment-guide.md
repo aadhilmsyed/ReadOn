@@ -36,7 +36,7 @@ READON_DEPLOY_ENV=test SERVICE_VERSION=$(git rev-parse HEAD) bash ops/gcp/deploy
 ```bash
 READON_DEPLOY_ENV=prod bash ops/gcp/deploy-main.sh
 READON_DEPLOY_ENV=prod bash ops/gcp/deploy-microservice-audiobook.sh
-# … phonics, comprehension, visualization
+# … phonics, comprehension, visualization, dashboard
 ```
 
 ## CI/CD

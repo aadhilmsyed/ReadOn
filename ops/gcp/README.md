@@ -1,6 +1,6 @@
 # ReadOn - GCP Skeleton Deployment
 
-This directory deploys the **skeleton only** of ReadOn (no business logic): main Next.js app plus four microservices to Cloud Run, with **prod** and **test** stacks in the same project.
+This directory deploys the ReadOn stack to Cloud Run: main Next.js app plus five microservices (`phonics`, `comprehension`, `visualization`/image-generation, `audiobook`, and `dashboard`) with **prod** and **test** stacks in the same project.
 
 ## Prerequisites
 

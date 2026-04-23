@@ -20,6 +20,7 @@ services=(
   "${COMPREHENSION_RUN_SERVICE_NAME}"
   "${VISUALIZATION_RUN_SERVICE_NAME}"
   "${AUDIOBOOK_RUN_SERVICE_NAME}"
+  "${DASHBOARD_RUN_SERVICE_NAME}"
 )
 
 for svc in "${services[@]}"; do

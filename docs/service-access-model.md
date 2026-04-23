@@ -1,6 +1,6 @@
 # ReadOn Service Access Model
 
-This document describes which services are public vs authenticated-only for **prod** and **test** stacks.
+This document describes the default service access model for **prod** and **test** stacks.
 
 ## Public (browser-facing UI shell)
 
@@ -9,21 +9,19 @@ This document describes which services are public vs authenticated-only for **pr
 
 These are deployed with unauthenticated access enabled.
 
-## Authenticated-only (microservices)
+## Microservices
 
-**Prod:** `readon-phonics`, `readon-comprehension`, `readon-visualization`, `readon-audiobook`
+**Prod:** `readon-phonics`, `readon-comprehension`, `readon-visualization`, `readon-audiobook`, `readon-dashboard`
 
-**Test:** `readon-phonics-test`, `readon-comprehension-test`, `readon-visualization-test`, `readon-audiobook-test`
+**Test:** `readon-phonics-test`, `readon-comprehension-test`, `readon-visualization-test`, `readon-audiobook-test`, `readon-dashboard-test`
 
-For each stack:
+Deploy behavior is controlled by `READON_MICROSERVICES_PUBLIC` in `ops/gcp/deploy-microservice.sh`:
 
-- Public `allUsers` invoker is removed after deploy.
-- The corresponding **main** runtime service account is granted `roles/run.invoker`:
-  - Prod: `readon-main-sa@<project>.iam.gserviceaccount.com`
-  - Test: `readon-main-sa-test@<project>.iam.gserviceaccount.com`
+- `true` (default): grant `allUsers` invoker (public endpoints) and also keep main service-account invoker.
+- `false`: remove `allUsers` invoker and keep only main service-account invoker.
 
 ## Health endpoints
 
 All services expose `/health`, `/live`, `/ready`.
 
-External unauthenticated calls to microservices may receive `403` (or `401`) while Cloud Run control-plane health checks still succeed. Verification scripts treat that as expected for microservices.
+Depending on `READON_MICROSERVICES_PUBLIC`, external unauthenticated calls may return either `200` (public) or `401`/`403` (invoker-only). Control-plane health can remain healthy in either model.

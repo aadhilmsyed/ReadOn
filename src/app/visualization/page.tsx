@@ -333,15 +333,17 @@ function VisualizationPageInner() {
   useEffect(() => {
     if (scenes.length === 0) return undefined;
 
-    const el = bookTrackRef.current;
-    if (!el) return undefined;
-
     function measure() {
+      const el = bookTrackRef.current;
+      if (!el) return;
       const w = el.getBoundingClientRect().width;
       if (w >= 32) {
         setBookSize(computeBookDimensions(w));
       }
     }
+
+    const el = bookTrackRef.current;
+    if (!el) return undefined;
 
     measure();
     const rafId = requestAnimationFrame(measure);

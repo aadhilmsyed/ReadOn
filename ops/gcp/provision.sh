@@ -245,6 +245,7 @@ for READON_DEPLOY_ENV in prod test; do
   sa_create "${COMPREHENSION_SA_NAME}" "ReadOn comprehension Cloud Run (${READON_DEPLOY_ENV})"
   sa_create "${VISUALIZATION_SA_NAME}" "ReadOn visualization Cloud Run (${READON_DEPLOY_ENV})"
   sa_create "${AUDIOBOOK_SA_NAME}" "ReadOn audiobook Cloud Run (${READON_DEPLOY_ENV})"
+  sa_create "${DASHBOARD_SA_NAME}" "ReadOn dashboard Cloud Run (${READON_DEPLOY_ENV})"
 
   SERVICE_ACCOUNTS=(
     "${MAIN_SA_EMAIL}"
@@ -252,6 +253,7 @@ for READON_DEPLOY_ENV in prod test; do
     "${COMPREHENSION_SA_EMAIL}"
     "${VISUALIZATION_SA_EMAIL}"
     "${AUDIOBOOK_SA_EMAIL}"
+    "${DASHBOARD_SA_EMAIL}"
   )
 
   echo "==> Environment ${READON_DEPLOY_ENV}: IAM for runtime service accounts"
@@ -262,7 +264,11 @@ for READON_DEPLOY_ENV in prod test; do
     grant_ar_repo_role "${sa_email}" "roles/artifactregistry.reader"
     grant_bucket_role "${sa_email}" "roles/storage.objectViewer"
   done
+
 done
+
+# Audiobook: Cloud Text-to-Speech (ADC uses the Cloud Run runtime service account).
+gcloud services enable texttospeech.googleapis.com --project="${GCP_PROJECT_ID}" --quiet || true
 
 ########################################
 # GitHub Actions: Cloud Build source bucket (CI deployer SAs must exist — run wif/setup-github-oidc-wif.sh if missing)

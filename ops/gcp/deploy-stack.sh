@@ -34,6 +34,7 @@ bash "${script_dir}/deploy-microservice-phonics.sh"
 bash "${script_dir}/deploy-microservice-comprehension.sh"
 bash "${script_dir}/deploy-microservice-visualization.sh"
 bash "${script_dir}/deploy-microservice-audiobook.sh"
+bash "${script_dir}/deploy-microservice-dashboard.sh"
 
 run_url() {
   gcloud run services describe "$1" --region="${REGION}" --project="${GCP_PROJECT_ID}" --format='value(status.url)'
@@ -42,7 +43,9 @@ run_url() {
 export READON_PHONICS_SERVICE_URL="$(run_url "${PHONICS_RUN_SERVICE_NAME}")"
 export READON_COMPREHENSION_SERVICE_URL="$(run_url "${COMPREHENSION_RUN_SERVICE_NAME}")"
 export READON_VISUALIZATION_SERVICE_URL="$(run_url "${VISUALIZATION_RUN_SERVICE_NAME}")"
+export READON_IMAGE_GENERATION_SERVICE_URL="${READON_VISUALIZATION_SERVICE_URL}"
 export READON_AUDIOBOOK_SERVICE_URL="$(run_url "${AUDIOBOOK_RUN_SERVICE_NAME}")"
+export READON_DASHBOARD_SERVICE_URL="$(run_url "${DASHBOARD_RUN_SERVICE_NAME}")"
 
 bash "${script_dir}/deploy-main.sh"
 

@@ -25,10 +25,18 @@ function validateSourceText(sourceText: string): string {
   return trimmed;
 }
 
-function resolveCredentialsPath() {
+/**
+ * Returns a key file path when a usable JSON key exists; otherwise null so the
+ * client uses Application Default Credentials (Cloud Run attached service account).
+ */
+function resolveOptionalKeyFilePath(): string | null {
   const explicit = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
   if (explicit) {
-    return path.isAbsolute(explicit) ? explicit : path.join(process.cwd(), explicit);
+    const resolved = path.isAbsolute(explicit) ? explicit : path.join(process.cwd(), explicit);
+    if (existsSync(resolved)) {
+      return resolved;
+    }
+    return null;
   }
   const candidates = [
     path.join(process.cwd(), 'credentials', 'google-application-credentials.json'),
@@ -36,9 +44,11 @@ function resolveCredentialsPath() {
     path.join(__dirname, '..', 'google-tts-service-account.json'),
   ];
   for (const c of candidates) {
-    if (existsSync(c)) return c;
+    if (existsSync(c)) {
+      return c;
+    }
   }
-  return candidates[0];
+  return null;
 }
 
 /**
@@ -47,15 +57,8 @@ function resolveCredentialsPath() {
  */
 export async function synthesizeGoogleTts(sourceText: string): Promise<AudiobookSpeechResult> {
   const text = validateSourceText(sourceText);
-  const credentialsPath = resolveCredentialsPath();
-
-  if (!existsSync(credentialsPath)) {
-    throw new Error(
-      `Google credentials file not found at "${credentialsPath}". Set GOOGLE_APPLICATION_CREDENTIALS or place google-tts-service-account.json next to this service.`,
-    );
-  }
-
-  const client = new TextToSpeechClient({ keyFilename: credentialsPath });
+  const keyFile = resolveOptionalKeyFilePath();
+  const client = keyFile ? new TextToSpeechClient({ keyFilename: keyFile }) : new TextToSpeechClient();
   const languageCode = process.env.GOOGLE_TTS_LANGUAGE_CODE ?? 'en-US';
   const voiceName = process.env.GOOGLE_TTS_VOICE_NAME ?? 'en-US-Neural2-J';
 
