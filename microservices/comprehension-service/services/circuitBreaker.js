@@ -1,11 +1,19 @@
+const { ClosedState } = require('./circuitBreaker/ClosedState');
+const { OpenState } = require('./circuitBreaker/OpenState');
+const { HalfOpenState } = require('./circuitBreaker/HalfOpenState');
+
 class CircuitBreaker {
   constructor({ failureThreshold, resetTimeoutMs, now }) {
     this.failureThreshold = failureThreshold;
     this.resetTimeoutMs = resetTimeoutMs;
     this.now = now || (() => Date.now());
-    this.state = 'closed';
     this.failureCount = 0;
     this.openedAtMs = null;
+    this.halfOpenProbeInFlight = false;
+    this.closedState = new ClosedState();
+    this.openState = new OpenState();
+    this.halfOpenState = new HalfOpenState();
+    this.state = this.closedState;
   }
 
   snapshot() {
@@ -18,15 +26,15 @@ class CircuitBreaker {
   }
 
   currentState() {
-    if (this.state === 'open' && this.openedAtMs !== null && this.now() - this.openedAtMs >= this.resetTimeoutMs) {
-      this.state = 'half_open';
+    if (this.state.name === 'open' && this.shouldAttemptReset()) {
+      this.transitionToHalfOpen();
     }
 
-    return this.state;
+    return this.state.name;
   }
 
   retryAfterSeconds() {
-    if (this.state !== 'open' || this.openedAtMs === null) {
+    if (this.state.name !== 'open' || this.openedAtMs === null) {
       return null;
     }
 
@@ -34,47 +42,61 @@ class CircuitBreaker {
     return Math.ceil(remainingMs / 1000);
   }
 
-  async execute(operation) {
-    if (this.currentState() === 'open') {
-      const err = new Error('Circuit breaker is open.');
-      err.code = 'CIRCUIT_OPEN';
-      throw err;
-    }
+  shouldAttemptReset() {
+    return this.openedAtMs !== null && this.now() - this.openedAtMs >= this.resetTimeoutMs;
+  }
 
-    try {
-      const result = await operation();
-      this.recordSuccess();
-      return result;
-    } catch (err) {
-      this.recordFailure();
-      throw err;
-    }
+  createOpenError(message) {
+    const err = new Error(message || 'Circuit breaker is open.');
+    err.code = 'CIRCUIT_OPEN';
+    return err;
+  }
+
+  setState(nextState) {
+    this.state = nextState;
+  }
+
+  transitionToOpen() {
+    this.openedAtMs = this.now();
+    this.setState(this.openState);
+  }
+
+  transitionToHalfOpen() {
+    this.setState(this.halfOpenState);
+  }
+
+  transitionToClosed() {
+    this.openedAtMs = null;
+    this.halfOpenProbeInFlight = false;
+    this.setState(this.closedState);
+  }
+
+  async execute(operation) {
+    return this.state.handleRequest(this, operation);
   }
 
   recordSuccess() {
-    this.state = 'closed';
     this.failureCount = 0;
-    this.openedAtMs = null;
+    this.transitionToClosed();
   }
 
   recordFailure() {
-    if (this.state === 'half_open') {
-      this.open();
+    if (this.state.name === 'half_open') {
+      this.transitionToOpen();
       return;
     }
 
     this.failureCount += 1;
 
     if (this.failureCount >= this.failureThreshold) {
-      this.open();
+      this.transitionToOpen();
     }
   }
-
-  open() {
-    this.state = 'open';
-    this.openedAtMs = this.now();
-  }
-
 }
 
-module.exports = { CircuitBreaker };
+module.exports = {
+  CircuitBreaker,
+  ClosedState,
+  OpenState,
+  HalfOpenState,
+};
