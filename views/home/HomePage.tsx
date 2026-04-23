@@ -300,7 +300,7 @@ export default function HomePage() {
               Generate Story
             </Button>
             <Text fontSize="sm" color="gray.500" textAlign="center">
-              Signed-in learners only. Up to four experiences run together; credits apply only to features that succeed.
+              Signed-in learners only. Up to four experiences run together; each feature that runs successfully consumes 10 credits.
             </Text>
           </VStack>
         </Box>
