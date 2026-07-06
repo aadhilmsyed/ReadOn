@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 
-import { getReaderStoryRecord } from '@orchestrators/dashboard/clients/readerStoriesClient';
+import { getReaderStoryRecord, patchReaderStoryRecord } from '@orchestrators/dashboard/clients/readerStoriesClient';
+import { visualizationHasScenes } from '@orchestrators/story/visualizationReconcile';
 import { getSessionUserFromCookies } from '@/lib/auth/getSessionUser';
 import { FeaturesStoryHubPage } from '@views/features/FeaturesStoryHubPage';
 import type { FeatureKey } from '@shared/types/features';
@@ -25,6 +26,18 @@ export default async function FeaturesStoryPage({ params }: { params: { storyId:
     visualization: row.visualization_status,
     audiobook: row.audiobook_status,
   };
+
+  if (
+    (features.visualization === 'failed' || features.visualization === 'unavailable') &&
+    (await visualizationHasScenes(row.story_id))
+  ) {
+    features.visualization = 'ready';
+    try {
+      await patchReaderStoryRecord(row.story_id, session.email, { visualization_status: 'ready' });
+    } catch {
+      // Still allow launch when scenes exist upstream.
+    }
+  }
 
   return (
     <FeaturesStoryHubPage

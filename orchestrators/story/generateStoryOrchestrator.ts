@@ -7,6 +7,7 @@ import {
   patchReaderStoryRecord,
   type ReaderStoryFeatureStatus,
 } from '@orchestrators/dashboard/clients/readerStoriesClient';
+import { visualizationHasScenes } from './visualizationReconcile';
 import {
   audiobookServiceBase,
   comprehensionServiceBase,
@@ -104,22 +105,34 @@ async function prepareComprehension(
 
 async function prepareVisualization(storyId: string, userId: string, storyText: string): Promise<boolean> {
   const base = imageGenerationServiceBase();
-  const timeoutMs = Number(process.env.READON_IMAGE_GEN_FETCH_TIMEOUT_MS ?? 180000);
-  const res = await fetch(`${base}/images/storybook`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ storyId, storyText, userId }),
-    cache: 'no-store',
-    signal: AbortSignal.timeout(Number.isFinite(timeoutMs) ? timeoutMs : 180000),
-  });
-  let body: unknown = {};
+  // Storybook generates one image per paragraph (~40–50s each); allow ample headroom.
+  const timeoutMs = Number(process.env.READON_IMAGE_GEN_FETCH_TIMEOUT_MS ?? 600000);
   try {
-    body = await res.json();
+    const res = await fetch(`${base}/images/storybook`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ storyId, storyText, userId }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(Number.isFinite(timeoutMs) ? timeoutMs : 600000),
+    });
+    let body: unknown = {};
+    try {
+      body = await res.json();
+    } catch {
+      body = {};
+    }
+    const j = body as { success?: boolean; scenes?: Array<{ response?: { success?: boolean; images?: unknown[] } }> };
+    const scenes = Array.isArray(j.scenes) ? j.scenes : [];
+    const hasImages = scenes.length > 0 && scenes.every(
+      (s) => s.response?.success === true && Array.isArray(s.response.images) && s.response.images.length > 0,
+    );
+    if (res.ok && j.success === true && hasImages) {
+      return true;
+    }
   } catch {
-    body = {};
+    // Client timeout — generation may still complete server-side; reconcile below.
   }
-  const j = body as { success?: boolean };
-  return res.ok && j.success === true;
+  return visualizationHasScenes(storyId);
 }
 
 async function prepareAudiobook(storyText: string): Promise<{ ok: boolean; audioBase64?: string }> {
@@ -206,6 +219,16 @@ async function warmVisualizationRead(storyId: string): Promise<void> {
   if (!res.ok) {
     throw new Error(`visualization_warm_failed:${res.status}`);
   }
+  let body: unknown = {};
+  try {
+    body = await res.json();
+  } catch {
+    body = {};
+  }
+  const j = body as { scenes?: unknown[] };
+  if (!Array.isArray(j.scenes) || j.scenes.length === 0) {
+    throw new Error('visualization_warm_empty_scenes');
+  }
 }
 
 async function warmFeatureReadPaths(args: {
@@ -277,6 +300,14 @@ export async function generateStoryForUser(input: GenerateStoryInput): Promise<G
     const value = r.status === 'fulfilled' ? r.value : null;
     features[key] = isReadyAtIndex(i, value) ? 'ready' : 'failed';
   });
+
+  // Reconcile visualization if client timed out but images were persisted server-side.
+  if (features.visualization === 'failed') {
+    const hasScenes = await visualizationHasScenes(storyId);
+    if (hasScenes) {
+      features.visualization = 'ready';
+    }
+  }
 
   const compVal =
     settled[1].status === 'fulfilled' ? (settled[1].value as { ok?: boolean; resultId?: string }) : null;
