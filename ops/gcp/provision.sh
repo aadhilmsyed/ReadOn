@@ -265,10 +265,16 @@ for READON_DEPLOY_ENV in prod test; do
     grant_bucket_role "${sa_email}" "roles/storage.objectViewer"
   done
 
+  grant_project_role "${COMPREHENSION_SA_EMAIL}" "roles/aiplatform.user"
+  grant_project_role "${VISUALIZATION_SA_EMAIL}" "roles/aiplatform.user"
+
 done
 
 # Audiobook: Cloud Text-to-Speech (ADC uses the Cloud Run runtime service account).
 gcloud services enable texttospeech.googleapis.com --project="${GCP_PROJECT_ID}" --quiet || true
+
+# Vertex AI (Gemini image + text generation for visualization and comprehension services).
+gcloud services enable aiplatform.googleapis.com --project="${GCP_PROJECT_ID}" --quiet || true
 
 ########################################
 # GitHub Actions: Cloud Build source bucket (CI deployer SAs must exist — run wif/setup-github-oidc-wif.sh if missing)

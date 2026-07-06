@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node server.js"
   },
   "dependencies": {
+    "@google-cloud/vertexai": "^1.10.0",
     "dotenv": "^17.4.2",
     "pg": "^8.20.0"
   }

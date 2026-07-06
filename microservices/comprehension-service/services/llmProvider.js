@@ -1,3 +1,5 @@
+const { VertexAI } = require('@google-cloud/vertexai');
+
 function timeoutPromise(ms) {
   return new Promise((_, reject) => {
     setTimeout(() => {
@@ -45,7 +47,7 @@ const QUESTION_SCHEMA = {
   required: ['questions'],
 };
 
-function buildOpenAiPrompt({ sourceText, questionCount, difficulty }) {
+function buildQuestionPrompt({ sourceText, questionCount, difficulty }) {
   return [
     'Create multiple-choice reading comprehension questions for students.',
     `Difficulty: ${difficulty}.`,
@@ -56,6 +58,10 @@ function buildOpenAiPrompt({ sourceText, questionCount, difficulty }) {
     'Story text:',
     sourceText,
   ].join('\n');
+}
+
+function buildOpenAiPrompt(args) {
+  return buildQuestionPrompt(args);
 }
 
 function parseOpenAiResponse(body) {
@@ -203,11 +209,70 @@ async function callEndpointProvider({ sourceText, questionCount, difficulty, res
   return normalizeQuestions(body.questions || body, resultId);
 }
 
+function parseVertexJsonResponse(body) {
+  const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof text !== 'string' || !text.trim()) {
+    const err = new Error('Vertex response did not include JSON output text.');
+    err.code = 'INVALID_LLM_RESPONSE';
+    throw err;
+  }
+  return JSON.parse(text);
+}
+
+async function callVertexProvider({ sourceText, questionCount, difficulty, resultId, config }) {
+  const project = config.vertexProject;
+  const location = config.vertexLocation;
+  const model = config.vertexModel;
+
+  if (!project || !location) {
+    const err = new Error('VERTEX_AI_PROJECT and VERTEX_AI_LOCATION must be configured.');
+    err.code = 'LLM_PROVIDER_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const vertexAI = new VertexAI({ project, location });
+  const generativeModel = vertexAI.getGenerativeModel({
+    model,
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: QUESTION_SCHEMA,
+    },
+  });
+
+  const providerRequest = generativeModel.generateContent({
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: [
+              'You are an expert reading teacher who writes helpful, fair comprehension questions for students.',
+              buildQuestionPrompt({ sourceText, questionCount, difficulty }),
+            ].join('\n\n'),
+          },
+        ],
+      },
+    ],
+  }).then((result) => result.response);
+
+  const body = await Promise.race([
+    providerRequest,
+    timeoutPromise(config.llmTimeoutMs),
+  ]);
+
+  const parsed = parseVertexJsonResponse(body);
+  return normalizeQuestions(parsed.questions || parsed, resultId);
+}
+
 async function callConfiguredProvider(args) {
   const provider = (args.config.llmProvider || '').toLowerCase();
 
   if (provider === 'openai' || (!provider && args.config.openAiApiKey)) {
     return callOpenAiProvider(args);
+  }
+
+  if (provider === 'vertex' || !provider) {
+    return callVertexProvider(args);
   }
 
   return callEndpointProvider(args);

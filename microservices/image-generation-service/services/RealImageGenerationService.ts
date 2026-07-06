@@ -1,18 +1,19 @@
 import { IImageGenerationService } from './IImageGenerationService';
 import { GenerateImageRequestDTO, GenerateImageResponseDTO, GeneratedImageDTO } from '../types/dtos';
-import { ExternalAIImageClient } from '../clients/ExternalAIImageClient';
+import type { IImageProvider } from '../clients/IImageProvider';
+import { createImageProvider } from '../clients/createImageProvider';
 import { CloudStorageClient } from '../clients/CloudStorageClient';
 import { Logger } from '../utils/logger';
 import { retryWithBackoff } from '../utils/retryPolicy';
 import { ErrorCode, GenerationStatus } from '../types/enums';
 
 export class RealImageGenerationService implements IImageGenerationService {
-  private client: ExternalAIImageClient;
+  private client: IImageProvider;
   private storageClient: CloudStorageClient;
   private logger: Logger;
 
-  constructor(client?: ExternalAIImageClient, storageClient?: CloudStorageClient) {
-    this.client = client || new ExternalAIImageClient();
+  constructor(client?: IImageProvider, storageClient?: CloudStorageClient) {
+    this.client = client || createImageProvider();
     this.storageClient = storageClient || new CloudStorageClient();
     this.logger = new Logger('RealImageGenerationService');
   }
