@@ -1,12 +1,18 @@
 export type StorageDriver = 'postgres' | 'memory';
+export type ImageProviderKind = 'vertex' | 'openai';
 
 export interface AppConfig {
   port: number;
   aiProvider: {
+    provider: ImageProviderKind;
     apiKey: string;
     endpoint: string;
     model: string;
     timeoutMs: number;
+  };
+  vertex: {
+    project: string;
+    location: string;
   };
   cache: {
     ttlSeconds: number;
@@ -60,13 +66,24 @@ function readStorageDriver(): StorageDriver {
   return raw;
 }
 
+function readImageProvider(): ImageProviderKind {
+  const raw = (process.env.AI_IMAGE_PROVIDER || 'vertex').toLowerCase();
+  if (raw === 'openai') return 'openai';
+  return 'vertex';
+}
+
 export const config: AppConfig = {
   port: readInt('PORT', 3003),
   aiProvider: {
+    provider: readImageProvider(),
     apiKey: process.env.AI_IMAGE_API_KEY || '',
     endpoint: process.env.AI_IMAGE_API_ENDPOINT || 'https://api.openai.com/v1/images/generations',
-    model: process.env.AI_IMAGE_MODEL || 'gpt-image-1',
-    timeoutMs: readInt('AI_TIMEOUT', 30000),
+    model: process.env.AI_IMAGE_MODEL || 'gemini-2.5-flash-image',
+    timeoutMs: readInt('AI_TIMEOUT', 120000),
+  },
+  vertex: {
+    project: process.env.VERTEX_AI_PROJECT || process.env.GCP_PROJECT_ID || 'readon-ai',
+    location: process.env.VERTEX_AI_LOCATION || process.env.REGION || 'us-central1',
   },
   cache: {
     ttlSeconds: readInt('CACHE_TTL', 3600),
@@ -95,8 +112,13 @@ export const config: AppConfig = {
 export function listMissingGenerationConfig(appConfig: AppConfig = config): string[] {
   const missing: string[] = [];
 
-  if (!appConfig.aiProvider.apiKey) missing.push('AI_IMAGE_API_KEY');
-  if (!appConfig.aiProvider.endpoint) missing.push('AI_IMAGE_API_ENDPOINT');
+  if (appConfig.aiProvider.provider === 'openai') {
+    if (!appConfig.aiProvider.apiKey) missing.push('AI_IMAGE_API_KEY');
+    if (!appConfig.aiProvider.endpoint) missing.push('AI_IMAGE_API_ENDPOINT');
+  } else {
+    if (!appConfig.vertex.project) missing.push('VERTEX_AI_PROJECT or GCP_PROJECT_ID');
+    if (!appConfig.vertex.location) missing.push('VERTEX_AI_LOCATION or REGION');
+  }
 
   if (appConfig.storage.driver === 'postgres') {
     if (!appConfig.database.host) missing.push('DB_HOST');
