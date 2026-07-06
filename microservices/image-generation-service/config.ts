@@ -5,6 +5,7 @@ export interface AppConfig {
   aiProvider: {
     apiKey: string;
     endpoint: string;
+    model: string;
     timeoutMs: number;
   };
   cache: {
@@ -64,6 +65,7 @@ export const config: AppConfig = {
   aiProvider: {
     apiKey: process.env.AI_IMAGE_API_KEY || '',
     endpoint: process.env.AI_IMAGE_API_ENDPOINT || 'https://api.openai.com/v1/images/generations',
+    model: process.env.AI_IMAGE_MODEL || 'gpt-image-1',
     timeoutMs: readInt('AI_TIMEOUT', 30000),
   },
   cache: {
