@@ -10,7 +10,7 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 
 ## Project / Region
 
-- `GCP_PROJECT_ID`: `readon-492106`
+- `GCP_PROJECT_ID`: `readon-ai`
 - `REGION`: `us-central1`
 
 ## Networking
@@ -26,14 +26,14 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 - Engine: PostgreSQL 16
 - Tier: `db-g1-small`
 - PSA range: `readon-sql-psa-range`
-- Connection name: `readon-492106:us-central1:readon-sql`
+- Connection name: `readon-ai:us-central1:readon-sql`
 - **Databases:** `readon` (prod), `readon_test` (test)
 
 ## Cloud Storage
 
-- Prod bucket: `readon-492106-assets`
-- Test bucket: `readon-492106-assets-test`
-- Cloud Build staging (default): `readon-492106_cloudbuild` — CI deployer SAs need object access here for `gcloud builds submit` from GitHub Actions; apply with `ops/gcp/grant-cicd-cloudbuild-access.sh` (also run from `provision.sh` / WIF setup)
+- Prod bucket: `readon-ai-assets`
+- Test bucket: `readon-ai-assets-test`
+- Cloud Build staging (default): `readon-ai_cloudbuild`
 
 ## Artifact Registry
 
@@ -45,7 +45,7 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 
 **Prod**
 
-- `readon-main-sa@readon-492106.iam.gserviceaccount.com`
+- `readon-main-sa@readon-ai.iam.gserviceaccount.com`
 - `readon-phonics-sa@…`
 - `readon-comprehension-sa@…`
 - `readon-visualization-sa@…`
@@ -53,7 +53,7 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 
 **Test** (`*-sa-test`)
 
-- `readon-main-sa-test@readon-492106.iam.gserviceaccount.com`
+- `readon-main-sa-test@readon-ai.iam.gserviceaccount.com`
 - `readon-phonics-sa-test@…`
 - `readon-comprehension-sa-test@…`
 - `readon-visualization-sa-test@…`
@@ -61,8 +61,8 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 
 ## CI/CD service accounts (GitHub Actions via WIF)
 
-- `readon-cicd-test@readon-492106.iam.gserviceaccount.com` — branch `dev` only (OIDC subject binding)
-- `readon-cicd-prod@readon-492106.iam.gserviceaccount.com` — branch `main` only
+- `readon-cicd-test@readon-ai.iam.gserviceaccount.com` — branch `dev` only (OIDC subject binding)
+- `readon-cicd-prod@readon-ai.iam.gserviceaccount.com` — branch `main` only
 
 ## IAM (runtime, per account)
 
@@ -82,7 +82,7 @@ Per deployer SA (project level):
 - `roles/cloudbuild.builds.editor`
 - `roles/serviceusage.serviceUsageConsumer`
 
-On bucket `gs://readon-492106_cloudbuild` (when it exists):
+On bucket `gs://readon-ai_cloudbuild` (when it exists):
 
 - `roles/storage.objectAdmin` for each CI deployer SA (source upload for Cloud Build)
 

@@ -113,7 +113,7 @@ app.get('/images/story/:storyId', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: { message: 'storyId is required' } });
     }
     const rows = await repository.findByStoryId(storyId);
-    const bucketName = process.env.READON_STORAGE_BUCKET || 'readon-492106-assets';
+    const bucketName = process.env.READON_STORAGE_BUCKET || 'readon-ai-assets';
     
     const scenes = rows.map((row) => {
       // Prefer GCS URLs from storageKeys (permanent), fallback to imageUrls (may be expired)
