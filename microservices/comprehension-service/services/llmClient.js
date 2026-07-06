@@ -32,7 +32,7 @@ class LLMClient {
 
   async generate(request) {
     const config = this.getConfig();
-    const providerName = config.llmProvider || (config.openAiApiKey ? 'openai' : 'scaffold');
+    const providerName = config.llmProvider || (config.openAiApiKey ? 'openai' : 'vertex');
     const questions = await this.providerCaller({
       sourceText: request.sourceText,
       questionCount: request.questionCount,
