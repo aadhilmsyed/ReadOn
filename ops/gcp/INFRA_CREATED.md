@@ -35,6 +35,13 @@ For the **prod vs test** model, see [../../docs/environment-separation.md](../..
 - Test bucket: `readon-ai-assets-test`
 - Cloud Build staging (default): `readon-ai_cloudbuild`
 
+## Vertex AI (Gemini)
+
+- API: `aiplatform.googleapis.com` (enabled in `provision.sh`)
+- Image generation: `gemini-2.5-flash-image` (Nano Banana) via `readon-visualization-sa`
+- Comprehension LLM: `gemini-2.5-flash` via `readon-comprehension-sa`
+- Runtime SAs: `roles/aiplatform.user` on visualization + comprehension service accounts
+
 ## Artifact Registry
 
 - Repository: `readon-artifacts` (docker)
