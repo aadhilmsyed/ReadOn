@@ -29,7 +29,7 @@ export class CloudStorageClient {
     }
     
     this.storage = new Storage(storageOptions);
-    this.bucketName = process.env.READON_STORAGE_BUCKET || 'readon-492106-assets';
+    this.bucketName = process.env.READON_STORAGE_BUCKET || 'readon-ai-assets';
     this.logger = new Logger('CloudStorageClient');
   }
 

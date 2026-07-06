@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getSessionUserFromRequest } from '@/lib/auth/getSessionUser';
-import { getReaderStoryRecord } from '@orchestrators/dashboard/clients/readerStoriesClient';
+import { getReaderStoryRecord, patchReaderStoryRecord } from '@orchestrators/dashboard/clients/readerStoriesClient';
 import { imageGenerationServiceBase } from '@orchestrators/story/serviceBaseUrls';
 
 export const dynamic = 'force-dynamic';
@@ -15,9 +15,6 @@ export async function GET(_request: Request, { params }: { params: { storyId: st
 
   const row = await getReaderStoryRecord(params.storyId, session.email);
   if (!row) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  }
-  if (row.visualization_status !== 'ready') {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
@@ -39,6 +36,23 @@ export async function GET(_request: Request, { params }: { params: { storyId: st
     } catch {
       parsed = { raw: text };
     }
+
+    const payload = parsed as { scenes?: unknown[] };
+    const hasScenes = Array.isArray(payload.scenes) && payload.scenes.length > 0;
+
+    if (!hasScenes && row.visualization_status !== 'ready') {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+
+    // Images exist but dashboard status is stale (e.g. client timeout during storygen).
+    if (hasScenes && row.visualization_status !== 'ready') {
+      try {
+        await patchReaderStoryRecord(params.storyId, session.email, { visualization_status: 'ready' });
+      } catch {
+        // Non-fatal: still return scenes to the client.
+      }
+    }
+
     return NextResponse.json(parsed as object, { status: res.status });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'fetch_failed';

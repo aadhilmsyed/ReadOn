@@ -47,15 +47,18 @@ export class ImageGenerationProxy implements IImageGenerationService {
       return this.buildErrorResponse(requestId, request.storyId, validationError);
     }
 
-    // Step 2: Check cache
+    // Step 2: Check cache (story-scoped requests skip cache — GCS paths and DB rows are per story)
     const cacheKey = generateCacheKey(request);
-    const cachedResult = await this.checkCache(cacheKey, requestId);
-    if (cachedResult) {
-      this.logger.info('Cache hit - returning cached result', { requestId, cacheKey });
-      return this.buildCachedResponse(requestId, request.storyId, cachedResult);
+    if (!request.storyId) {
+      const cachedResult = await this.checkCache(cacheKey, requestId);
+      if (cachedResult) {
+        this.logger.info('Cache hit - returning cached result', { requestId, cacheKey });
+        return this.buildCachedResponse(requestId, request.storyId, cachedResult);
+      }
+      this.logger.info('Cache miss - proceeding with generation', { requestId, cacheKey });
+    } else {
+      this.logger.info('Cache skipped for story-scoped request', { requestId, storyId: request.storyId });
     }
-
-    this.logger.info('Cache miss - proceeding with generation', { requestId, cacheKey });
 
     // Step 3: Check rate limit
     const rateLimitError = await this.checkRateLimit(requestId);
@@ -82,8 +85,8 @@ export class ImageGenerationProxy implements IImageGenerationService {
     // Step 6: Update metadata based on result
     await this.updateMetadataFromResult(requestId, result);
 
-    // Step 7: Cache successful result
-    if (result.success && result.images) {
+    // Step 7: Cache successful result (only for non-story requests)
+    if (!request.storyId && result.success && result.images) {
       await this.cacheResult(cacheKey, requestId, result);
     }
 

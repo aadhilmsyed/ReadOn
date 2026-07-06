@@ -10,7 +10,8 @@ export interface ExternalImageRequest {
 
 export interface ExternalImageResponse {
   images: Array<{
-    url: string;
+    url?: string;
+    base64?: string;
     storageKey?: string;
   }>;
   provider: string;
@@ -19,22 +20,26 @@ export interface ExternalImageResponse {
 export class ExternalAIImageClient {
   private apiKey: string;
   private apiEndpoint: string;
+  private model: string;
   private timeoutMs: number;
   private logger: Logger;
 
   constructor(
     apiKey: string = config.aiProvider.apiKey,
     apiEndpoint: string = config.aiProvider.endpoint,
+    model: string = config.aiProvider.model,
     timeoutMs: number = config.aiProvider.timeoutMs
   ) {
     this.apiKey = apiKey;
     this.apiEndpoint = apiEndpoint;
+    this.model = model;
     this.timeoutMs = timeoutMs;
     this.logger = new Logger('ExternalAIImageClient');
   }
 
   async generateImages(request: ExternalImageRequest): Promise<ExternalImageResponse> {
     this.logger.info('Calling external AI image provider', {
+      model: this.model,
       prompt: request.prompt.substring(0, 50),
       numImages: request.numImages,
     });
@@ -65,11 +70,11 @@ export class ExternalAIImageClient {
           'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          model: 'dall-e-3',
+          model: this.model,
           prompt: request.prompt,
-          n: 1, // DALL-E 3 only supports n=1
+          n: 1,
           size: '1024x1024',
-          quality: 'standard',
+          ...(this.model.startsWith('dall-e-3') ? { quality: 'standard' } : {}),
         }),
         signal: controller.signal,
       });
@@ -82,13 +87,27 @@ export class ExternalAIImageClient {
         throw new Error(`Provider returned status ${response.status}: ${errorBody}`);
       }
 
-      const data = await response.json();
-      
+      const data = await response.json() as {
+        data?: Array<{ url?: string; b64_json?: string }>;
+      };
+
+      const images = (data.data ?? []).map((img) => {
+        if (img.url) {
+          return { url: img.url };
+        }
+        if (img.b64_json) {
+          return { base64: img.b64_json };
+        }
+        return {};
+      }).filter((img) => img.url || img.base64);
+
+      if (images.length === 0) {
+        throw new Error('Provider returned no image data');
+      }
+
       return {
-        images: data.data?.map((img: { url: string }) => ({
-          url: img.url,
-        })) || [],
-        provider: 'external-ai-provider',
+        images,
+        provider: this.model,
       };
     } catch (error) {
       clearTimeout(timeoutId);

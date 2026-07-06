@@ -101,7 +101,7 @@ main().catch((e) => {
     console.error(
       '\n[phonics bootstrap] Nothing is accepting TCP connections on your DB host/port (connection refused).\n' +
         '  • If PHONICS_DATABASE_URL uses 127.0.0.1, start the Cloud SQL Auth Proxy for the **readon** instance first, e.g.:\n' +
-        '      cloud-sql-proxy readon-492106:us-central1:readon-sql --port 5432\n' +
+        '      cloud-sql-proxy readon-ai:us-central1:readon-sql --port 5432\n' +
         '    (Use another --port if 5432 is busy; then set PHONICS_DATABASE_URL to that port.)\n' +
         '  • Only one proxy should listen on a given port — a second database’s proxy on the same port will break connections.\n',
     );

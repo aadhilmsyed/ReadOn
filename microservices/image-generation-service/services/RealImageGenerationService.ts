@@ -48,16 +48,29 @@ export class RealImageGenerationService implements IImageGenerationService {
       const images: GeneratedImageDTO[] = [];
       
       for (let i = 0; i < response.images.length; i++) {
-        const tempUrl = response.images[i].url;
+        const imagePayload = response.images[i];
+        const tempUrl = imagePayload.url;
         this.logger.info(`Processing image ${i + 1}/${response.images.length}`, {
-          tempUrlPreview: tempUrl.substring(0, 80) + '...',
+          hasUrl: Boolean(tempUrl),
+          hasBase64: Boolean(imagePayload.base64),
         });
         
         try {
-          // Download image from temporary URL
-          this.logger.info('Downloading image from temporary URL...');
-          const imageBuffer = await this.storageClient.downloadImage(tempUrl);
-          this.logger.info('Image downloaded successfully', { sizeBytes: imageBuffer.length });
+          const imageBuffer = imagePayload.base64
+            ? Buffer.from(imagePayload.base64, 'base64')
+            : tempUrl
+              ? await this.storageClient.downloadImage(tempUrl)
+              : null;
+
+          if (!imageBuffer) {
+            throw new Error('Provider returned no image URL or base64 payload');
+          }
+
+          if (imagePayload.base64) {
+            this.logger.info('Using base64 image payload from provider', { sizeBytes: imageBuffer.length });
+          } else {
+            this.logger.info('Image downloaded successfully', { sizeBytes: imageBuffer.length });
+          }
           
           // Upload to GCS with proper path structure
           const storyId = request.storyId || 'default';
@@ -94,13 +107,14 @@ export class RealImageGenerationService implements IImageGenerationService {
             permanentUrlExpires: 'never',
           });
         } catch (uploadError) {
-          this.logger.error('❌ Failed to upload image to GCS, using temporary URL as fallback', uploadError as Error);
-          this.logger.warn('Image will expire in ~2 hours', { tempUrl: tempUrl.substring(0, 80) });
-          // Fallback to temporary URL if upload fails
-          images.push({
-            url: tempUrl,
-            provider: response.provider,
-          });
+          this.logger.error('❌ Failed to upload image to GCS', uploadError as Error);
+          if (tempUrl) {
+            this.logger.warn('Image will expire in ~2 hours', { tempUrl: tempUrl.substring(0, 80) });
+            images.push({
+              url: tempUrl,
+              provider: response.provider,
+            });
+          }
         }
       }
       

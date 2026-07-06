@@ -69,6 +69,7 @@ export async function generateStorybookFromStory(
       theme: 'reading visualization',
       ageGroup: 'children',
       numImages: 1,
+      paragraphIndex: i,
     });
     scenes.push({ paragraph, paragraphIndex: i, response });
     if (!response.success) {
